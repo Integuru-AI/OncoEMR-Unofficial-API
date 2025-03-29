@@ -1,9 +1,10 @@
+import asyncio
+import re
 import html
 import json
-import random
-import re
-import string
 import time
+import random
+import string
 from datetime import datetime
 from typing import List, Dict
 
@@ -12,21 +13,19 @@ from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 
 from submodule_integrations.models.integration import Integration
-from submodule_integrations.oncoemr.oncoemr_mapping import FOLLOWUP_TEXTFIELDS_MAPPING, FOLLOWUP_RADIO_BUTTONS_MAPPING, \
-    FOLLOWUP_CHECKBOXES_MAPPING
 from submodule_integrations.oncoemr.oncoemr_models import FollowupNoteTemplateModel
 from submodule_integrations.utils.errors import IntegrationAuthError, IntegrationAPIError
+from submodule_integrations.oncoemr.consultation_models import ConsultationNoteTemplateModel
+from submodule_integrations.oncoemr.consultation_mappings import CONSULTATION_TEXTFIELDS_MAPPING, \
+    CONSULTATION_RADIO_BUTTONS_MAPPING, CONSULTATION_CHECKBOXES_MAPPING
+from submodule_integrations.oncoemr.oncoemr_mapping import FOLLOWUP_TEXTFIELDS_MAPPING, FOLLOWUP_RADIO_BUTTONS_MAPPING, \
+    FOLLOWUP_CHECKBOXES_MAPPING
 
 
 class OncoEmrIntegration(Integration):
     def __init__(self, domain: str, token: str, network_requester=None, user_agent: str = UserAgent().random):
         super().__init__("oncoemr")
         self.user_agent = user_agent
-        # self.network_requester = None
-        # self.url = None
-        #     self.headers = None
-        #
-        # async def create(self, domain: str, token: str, network_requester=None):
         self.url = domain if "https://" in domain else f"https://{domain}"
         self.network_requester = network_requester
 
@@ -37,6 +36,16 @@ class OncoEmrIntegration(Integration):
             "Accept": "*/*",
             "Accept-Encoding": "gzip",
         }
+
+        self.user_id = None
+        self.group_id = None
+
+    @classmethod
+    async def create(cls, domain: str, token: str, network_requester=None, user_agent: str = UserAgent().random):
+        """Async factory method that ensures state is loaded before returning the instance"""
+        instance = cls(domain, token, network_requester, user_agent)
+        await instance._load_state_data()
+        return instance
 
     async def _make_request(self, method: str, url: str, **kwargs):
         if self.network_requester is not None:
@@ -81,6 +90,16 @@ class OncoEmrIntegration(Integration):
                 response.reason,
             )
 
+    async def _load_state_data(self):
+        path = self.url + "/nav/visit-list"
+        response = await self._make_request("GET", path, headers=self.headers)
+        soup = self._create_soup(response)
+
+        data_script = soup.select_one("script#json\\:piwikOptions")
+        data = json.loads(data_script.text.strip())
+        self.user_id = data.get("userId")
+        self.group_id = data.get("groupId")
+
     async def _get_physicians(self) -> List[Dict]:
         path = self.url + "/User/PhysicianUsers"
         headers = self.headers.copy()
@@ -124,8 +143,7 @@ class OncoEmrIntegration(Integration):
             'sResource': f'{doctor_id}',
             'bNewLocation': False,
             'bNewResource': True,
-            'sMDUID': 'UID_Jz650539279_110,UID_064X0KDB4BK4RNS2186G,UID_JB804617236_37,UID_Jz111795195_31,'
-                      'UID_064FSWMXCMTT0YVQZX19,UID_AS230126710_737,UID_JB87247623_83',
+            'sMDUID': '',
             'bShowPatLocCol': 'True',
             'bMDVisitsOnly': 'True',
             'bHideUnscheduled': 'True',
@@ -168,8 +186,8 @@ class OncoEmrIntegration(Integration):
         path = self.url + "/PartialPage/GetPageInfoForPatient"
         first_param = {
             'sPID': f'{patient_id}',
-            'sUID': 'UID_067YNQBAS60SNR4XCB6H',
-            'sGID': 'GH_Jz169169247_2',
+            'sUID': f'{self.user_id}',
+            'sGID': f'{self.group_id}',
             'bNewPatient': True,
             'bCheckAccess': True,
             'sRequestedPage': '$default$',
@@ -344,15 +362,15 @@ class OncoEmrIntegration(Integration):
         note_data = await self._get_note_data(patient_id, note_id)
         note_path = note_data.get('presignedUrl')
 
-        headers = {
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Encoding": "gzip, deflate",
-            "Referer": f"{self.url}/",
-        }
-        response = await self._make_request("GET", note_path, headers=headers)
+        # headers = {
+        #     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        #     "Accept-Encoding": "gzip, deflate",
+        #     "Referer": f"{self.url}/",
+        # }
+        # response = await self._make_request("GET", note_path, headers=headers)
         return {
             "data": note_data,
-            "file": response,
+            "file": note_path,
         }
 
     async def fetch_patient_notes(self, patient_id: str):
@@ -360,10 +378,15 @@ class OncoEmrIntegration(Integration):
         note_files = []
 
         for note in notes:
-            data = await self._get_note_pdf_file(
-                patient_id=patient_id,
-                note_id=note.get('note_id'),
-            )
+            data = {}
+            if note.get('note_id'):
+                data = await self._get_note_pdf_file(
+                    patient_id=patient_id,
+                    note_id=note.get('note_id'),
+                )
+            else:
+                data['status'] = 'No Note ID'
+
             data["name"] = note.get('name')
             note_files.append(data)
 
@@ -373,7 +396,7 @@ class OncoEmrIntegration(Integration):
         path = self.url + "//WebForms/PD_DocOncoNoteDB.aspx"
         params = {
             "FID": "DO_06APW5AY04PK7CHWD1EP",
-            "__OS": f"GH_Jz169169247_2~UID_067YNQBAS60SNR4XCB6H~{patient_id}",
+            "__OS": f"{self.group_id}~{self.user_id}~{patient_id}",
             "_SK": "",
             "__full": "true"
         }
@@ -384,15 +407,21 @@ class OncoEmrIntegration(Integration):
         patient_id = template.patient_id
         note_page = await self._followup_note_page(patient_id=patient_id)
 
-        soup = self._create_soup(note_page)
-        nc_start = note_page.find('BEGIN divTABDx/HPI') - 320
-        nc_end = note_page.find('END divTABFax') + nc_start
-        note_elem = soup.select_one("div#noteContent")
-        note_content = note_page[nc_start:nc_end]
+        # soup = self._create_soup(note_page)
+        # nc_start = note_page.find('BEGIN divTABDx/HPI') - 320
+        # nc_end = note_page.find('END divTABFax') + nc_start
+        # note_elem = soup.select_one("div#noteContent")
+        # note_content = note_page[nc_start:nc_end]
 
-        existing_data = self.extract_form_data_bs(note_page)
+        existing_data = self._extract_form_data_bs(note_page)
 
-        filled_template = self.apply_template_to_dict(template_model=template, target_dict=existing_data)
+        filled_template = self._apply_template_to_dict(
+            template_model=template,
+            target_dict=existing_data,
+            checkboxes_mapping=FOLLOWUP_CHECKBOXES_MAPPING,
+            radio_buttons_mapping=FOLLOWUP_RADIO_BUTTONS_MAPPING,
+            textfields_mapping=FOLLOWUP_TEXTFIELDS_MAPPING
+        )
         output_parts = [f"{k}%01{v}" for k, v in filled_template.items()]
         output_string = "%02".join(output_parts)
 
@@ -401,13 +430,13 @@ DH_06AX3GVPM7CS4W5F04JE%02
 DH_06AX3GVPM7CS4W5F04JE%02
 AsteraMedOncFollowUp-2023v9%02
 Astera MedOnc Follow Up - 2023 v8%02
-3%2F26%2F2025%02
+{self._get_current_date()}%02
 DO_06APW5AY04PK7CHWD1EP%02
 background%02
 %02
 %02
 %02
-GH_Jz169169247_2%02
+{self.group_id}%02
 {patient_id}%02
 %02
 %02
@@ -430,11 +459,128 @@ PRINT
 
         path = self.url + "/VisitNotes/AutoSaveVisitNote"
         response = await self._make_request("POST", path, json=query_json, headers=headers)
-        print(response)
+
+        return self._verify_note_str(response)
+
+    async def _initial_consultation_note_page(self, patient_id: str):
+        path = self.url + "//WebForms/PD_DocOncoNoteDB.aspx"
+        params = {
+            "FID": "DO_06APW5G421SENZ2PR3XB",
+            "__OS": f"{self.group_id}~{self.user_id}~{patient_id}",
+            "_SK": "",
+            "__full": "true"
+        }
+        response = await self._make_request("GET", path, params=params, headers=self.headers)
         return response
 
+    async def make_consultation_note(self, template: ConsultationNoteTemplateModel):
+        patient_id = template.patient_id
+        note_page = await self._initial_consultation_note_page(patient_id=patient_id)
+
+        existing_data = self._extract_form_data_bs(note_page)
+        filled_template = self._apply_template_to_dict(
+            template_model=template,
+            target_dict=existing_data,
+            checkboxes_mapping=CONSULTATION_CHECKBOXES_MAPPING,
+            radio_buttons_mapping=CONSULTATION_RADIO_BUTTONS_MAPPING,
+            textfields_mapping=CONSULTATION_TEXTFIELDS_MAPPING
+        )
+        output_parts = [f"{k}%01{v}" for k, v in filled_template.items()]
+        output_string = "%02".join(output_parts)
+
+        param_string = f"""
+DH_06AXJ5SRQMK8MFDGXC7C%02
+DH_06AXJ5SRQMK8MFDGXC7C%02
+AsteraMedOncInitialConsultation-2023v3%02
+Astera MedOnc Initial Consultation - 2023 v3%02
+{self._get_current_date()}%02
+DO_06APW5G421SENZ2PR3XB%02
+background%02
+%02
+%02
+%02
+{self.group_id}%02
+{patient_id}%02
+%02
+%02
+PRINT%02
+Note_06AXJ5QEZ8CM48J7XA14%02
+MD Visit Note%02
+{output_string}%02
+PRINT
+    """
+        param_string = param_string.replace("\n", '').strip()
+        query_json = {
+            'sNameValues': param_string,
+            'assessedDiagnosesData': '',
+            'autoSaveCounter': '1',
+            'hash': f'{int(time.time() * 1000)}{''.join(random.choice(string.ascii_lowercase) for _ in range(6))}',
+        }
+
+        headers = self.headers.copy()
+        headers["Content-Type"] = "application/json"
+
+        path = self.url + "/VisitNotes/AutoSaveVisitNote"
+        response = await self._make_request("POST", path, json=query_json, headers=headers)
+
+        return self._verify_note_str(response)
+
+    async def _get_icd10_code_data(self, code: str):
+        params = {
+            'searchTerm': code,
+            'includeRetired': "false",
+            'diseaseId': ''
+        }
+        path = self.url + "/ICDSearch/Search"
+        response = await self._make_request("GET", path, params=params, headers=self.headers)
+
+        codes = response.get("Codes")
+        this_data = next((item for item in codes if item.get('Code') == code), None)
+        return this_data
+
+    async def set_icd10_code(self, patient_id: str, code: str, add_type: str):
+        code = code.upper()
+        code_data = await self._get_icd10_code_data(code)
+        if code_data is None:
+            return {
+                'code': code,
+                'success': False,
+                'message': f"ICD-10 code `{code}` not found."
+            }
+
+        params = {
+            'AJAX': '1',
+            '__OS': f'{self.group_id}~{self.user_id}~{patient_id}',
+            'M': 'sSaveRS',
+            'P0': f'[{code}{code_data.get("LongDescription")}{add_type}{self._get_current_date()}'
+                  f'{patient_id}{code}]',
+            '_': f'{time.time() * 1000}',
+        }
+        path = self.url + "/pages_pd/PD_DiagnosisOncologyICD10DB.aspx"
+        response = await self._make_request("GET", path, params=params, headers=self.headers)
+        success = response.get("Success")
+        return {
+            'code': code,
+            'success': success,
+        }
+
     @staticmethod
-    def apply_template_to_dict(template_model: FollowupNoteTemplateModel, target_dict: Dict[str, str]) -> Dict[str, str]:
+    def _verify_note_str(data):
+        # The pattern: "background" followed by \u0001, then "DH_" followed by alphanumeric characters,
+        # then another \u0001, then the same "DH_" pattern again
+        pattern = r'^background\u0001(DH_[A-Z0-9]+)\u0001\1$'
+
+        match = re.match(pattern, data)
+        return bool(match)
+
+    @staticmethod
+    def _apply_template_to_dict(
+            template_model: FollowupNoteTemplateModel|ConsultationNoteTemplateModel,
+            target_dict: Dict[str, str],
+            radio_buttons_mapping: Dict,
+            checkboxes_mapping: Dict,
+            textfields_mapping: Dict,
+    ) -> Dict[str, str]:
         """
         Apply the template model to the target dictionary, handling both text fields and radio buttons.
 
@@ -453,7 +599,7 @@ PRINT
         # Process regular text fields
         for model_field, field_content in model_dict.items():
             # Skip patient_id and radio button fields
-            if model_field == "patient_id" or model_field in FOLLOWUP_RADIO_BUTTONS_MAPPING:
+            if model_field == "patient_id" or model_field in radio_buttons_mapping:
                 continue
 
             # Skip if no text content to add or not a field content object
@@ -461,8 +607,8 @@ PRINT
                 continue
 
             # Get the corresponding field in the target dict
-            if model_field in FOLLOWUP_TEXTFIELDS_MAPPING:
-                target_field = FOLLOWUP_TEXTFIELDS_MAPPING[model_field]
+            if model_field in textfields_mapping:
+                target_field = textfields_mapping[model_field]
 
                 # Only proceed if the target field exists in the dictionary
                 if target_field in result_dict:
@@ -474,7 +620,7 @@ PRINT
                         result_dict[target_field] = field_content["text"]
 
         # Process radio button fields
-        for field_name, mapping in FOLLOWUP_RADIO_BUTTONS_MAPPING.items():
+        for field_name, mapping in radio_buttons_mapping.items():
             selected_value = model_dict.get(field_name)
 
             if selected_value:
@@ -498,7 +644,7 @@ PRINT
                         result_dict[selected_key] = "true"
 
         # Process checkbox fields
-        for field_name, field_key in FOLLOWUP_CHECKBOXES_MAPPING.items():
+        for field_name, field_key in checkboxes_mapping.items():
             checkbox_value = model_dict.get(field_name)
 
             if checkbox_value is not None and field_key in result_dict:
@@ -586,7 +732,7 @@ PRINT
         return re.sub(clean, '', text).strip()
 
     @staticmethod
-    def extract_form_data_bs(full_html_string):
+    def _extract_form_data_bs(full_html_string):
         """
         Extracts form data ONLY for elements with IDs starting with 'FD_',
         using BeautifulSoup for parsing the entire HTML page. Creates key-value pairs

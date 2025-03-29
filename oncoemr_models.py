@@ -13,7 +13,8 @@ TobaccoStatusOptions = Literal["Non Smoker", "Never Smoked", "Smoker", "Ex-Smoke
 
 # Define how often options
 TobaccoFrequencyOptions = Literal[
-    "Tobacco smoking consumption unknown", "Smokes tobacco daily", "Occasional tobacco smoker"]
+    "Tobacco smoking consumption unknown", "Smokes tobacco daily", "Occasional tobacco smoker"
+]
 
 # Define intensity options
 TobaccoIntensityOptions = Literal["Light tobacco smoker", "Heavy tobacco smoker"]
@@ -22,18 +23,22 @@ TobaccoIntensityOptions = Literal["Light tobacco smoker", "Heavy tobacco smoker"
 ECigaretteOptions = Literal["Electronic cigarette user"]
 
 # Define tobacco type options
-TobaccoTypeOptions = Literal["Pipe smoker", "Snuff User", "Chews tobacco", "Use of moist powdered tobacco"]
+TobaccoTypeOptions = Literal[
+    "Pipe smoker", "Snuff User", "Chews tobacco", "Use of moist powdered tobacco"
+]
 
 # Define smokeless tobacco options
 SmokelessTobaccoOptions = Literal["Smokeless tobacco NON user", "User of smokeless tobacco"]
 
 # Define exposure options
 TobaccoExposureOptions = Literal[
-    "Exposed to tobacco smoke at home", "Exposed to tobacco smoke at work", "No known exposure to tobacco smoke"]
+    "Exposed to tobacco smoke at home", "Exposed to tobacco smoke at work", "No known exposure to tobacco smoke"
+]
 
 # Define smoking cessation intervention options
 SmokingCessationOptions = Literal[
-    "Not Discussed", "Advised to Quit", "Discussed Cessation Methods", "Discussed Cessation Medications"]
+    "Not Discussed", "Advised to Quit", "Discussed Cessation Methods", "Discussed Cessation Medications"
+]
 
 # Define family cancer history options
 FamilyCancerHistoryOptions = Literal["Has Cancer History", "None"]
@@ -276,9 +281,9 @@ class FollowupNoteTemplateModel(BaseModel):
     smoking_cessation: Optional[SmokingCessationOptions] = None
 
     # --- NEW Social History - Tobacco Use History Fields ---
-    sh_tobacco_discontinued_year_enabled: Optional[bool] = None # Checkbox: FD_chkSHTobUse_20
-    sh_tobacco_pack_years_enabled: Optional[bool] = None        # Checkbox: FD_chkSHTobUse_PH
-    sh_tobacco_type_details_enabled: Optional[bool] = None      # Checkbox: FD_chkSHTobUse_KIND
+    sh_tobacco_discontinued_year_enabled: Optional[bool] = None  # Checkbox: FD_chkSHTobUse_20
+    sh_tobacco_pack_years_enabled: Optional[bool] = None  # Checkbox: FD_chkSHTobUse_PH
+    sh_tobacco_type_details_enabled: Optional[bool] = None  # Checkbox: FD_chkSHTobUse_KIND
 
     # Family History fields
     mother_cancer_history: Optional[FamilyCancerHistoryOptions] = None
@@ -538,13 +543,13 @@ class FollowupNoteTemplateModel(BaseModel):
     pe_rectal_masses: Optional[PERectalMassesOptions] = None  # Radio group: FD_rdoRMASS
 
     # --- NEW Physical Exam - GU Fields ---
-    pe_gu_system_negative: Optional[bool] = None # Checkbox: FD_chkPEGU_02
-    pe_gu_deferred: Optional[bool] = None        # Checkbox: FD_chkPEGU_Deferred
+    pe_gu_system_negative: Optional[bool] = None  # Checkbox: FD_chkPEGU_02
+    pe_gu_deferred: Optional[bool] = None  # Checkbox: FD_chkPEGU_Deferred
     pe_gu_prostate: Optional[PEGUProstateOptions] = None
 
     # --- NEW Physical Exam - Peripheral Smear Fields ---
     # Checkboxes (allowing multiple selections)
-    pe_peripheral_smear_normal: Optional[bool] = None # Checkbox: FD_chkNormal PS
+    pe_peripheral_smear_normal: Optional[bool] = None  # Checkbox: FD_chkNormal PS
     pe_peripheral_smear_micro: Optional[bool] = None  # Checkbox: FD_chkMicro PS
     pe_peripheral_smear_macro: Optional[bool] = None  # Checkbox: FD_chkMacro PS
 
@@ -561,31 +566,31 @@ class FollowupNoteTemplateModel(BaseModel):
     length_of_patient_visit: Optional[LengthOfVisitOptions] = None
 
     # --- NEW Social History - Occupational Exposure Fields ---
-    sh_occupational_exposure_none: Optional[bool] = None      # Checkbox: FD_chkSHOP_Neg
-    sh_occupational_exposure_type_enabled: Optional[bool] = None # Checkbox: FD_chkSHOP_TYPE
-    sh_occupational_exposure_solvent: Optional[bool] = None   # Checkbox: FD_chkSolventexposure
+    sh_occupational_exposure_none: Optional[bool] = None  # Checkbox: FD_chkSHOP_Neg
+    sh_occupational_exposure_type_enabled: Optional[bool] = None  # Checkbox: FD_chkSHOP_TYPE
+    sh_occupational_exposure_solvent: Optional[bool] = None  # Checkbox: FD_chkSolventexposure
     sh_occupational_exposure_asbestos: Optional[bool] = None  # Checkbox: FD_chkAsbestosExp
-    sh_occupational_exposure_agent_orange: Optional[bool] = None # Checkbox: FD_chkAgentOrangeexp
+    sh_occupational_exposure_agent_orange: Optional[bool] = None  # Checkbox: FD_chkAgentOrangeexp
 
     # --- NEW Social History - Drug Use Fields ---
-    sh_drug_use_status: Optional[SHDrugUseStatusOptions] = None # Radio group: FD_rdoDRUGS
+    sh_drug_use_status: Optional[SHDrugUseStatusOptions] = None  # Radio group: FD_rdoDRUGS
     sh_drug_use_type_enabled: Optional[bool] = None
 
     # --- NEW Social History - Alcohol Use Fields ---
-    sh_alcohol_use_status: Optional[SHAlcoholUseStatusOptions] = None # Radio group: FD_rdoUSES
-    sh_alcohol_drinks_per_day_enabled: Optional[bool] = None   # Checkbox: FD_chkSHAlchUse_4
+    sh_alcohol_use_status: Optional[SHAlcoholUseStatusOptions] = None  # Radio group: FD_rdoUSES
+    sh_alcohol_drinks_per_day_enabled: Optional[bool] = None  # Checkbox: FD_chkSHAlchUse_4
     sh_alcohol_drinks_per_week_enabled: Optional[bool] = None  # Checkbox: FD_chkSHAlchUse_6
-    sh_alcohol_drinks_per_month_enabled: Optional[bool] = None # Checkbox: FD_chkSHAlchUse_8
+    sh_alcohol_drinks_per_month_enabled: Optional[bool] = None  # Checkbox: FD_chkSHAlchUse_8
     sh_alcohol_drinks_per_year_enabled: Optional[bool] = None  # Checkbox: FD_chkSHAlchUse_10
-    sh_alcohol_stopped_year_enabled: Optional[bool] = None     # Checkbox: FD_chkSHAlchStop
+    sh_alcohol_stopped_year_enabled: Optional[bool] = None  # Checkbox: FD_chkSHAlchStop
 
     # --- NEW Social History - Living Arrangements Fields ---
-    sh_living_with_spouse: Optional[bool] = None   # Checkbox: FD_chkWithSpouse
-    sh_living_alone: Optional[bool] = None         # Checkbox: FD_chkAlone
-    sh_living_with_children: Optional[bool] = None # Checkbox: FD_chkWithChildern
+    sh_living_with_spouse: Optional[bool] = None  # Checkbox: FD_chkWithSpouse
+    sh_living_alone: Optional[bool] = None  # Checkbox: FD_chkAlone
+    sh_living_with_children: Optional[bool] = None  # Checkbox: FD_chkWithChildern
     sh_living_nursing_home: Optional[bool] = None  # Checkbox: FD_chkNrsgHome
-    sh_living_other_enabled: Optional[bool] = None # Checkbox: FD_chkOther_2
+    sh_living_other_enabled: Optional[bool] = None  # Checkbox: FD_chkOther_2
 
     # --- NEW Health Maintenance Fields ---
-    hm_colonoscopy_enabled: Optional[bool] = None # Checkbox: FD_chkPHHS_Colon
+    hm_colonoscopy_enabled: Optional[bool] = None  # Checkbox: FD_chkPHHS_Colon
     hm_dexascan_enabled: Optional[bool] = None
