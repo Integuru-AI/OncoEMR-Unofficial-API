@@ -42,12 +42,12 @@ class OncoEmrIntegration(Integration):
 
     @classmethod
     async def create(cls, domain: str, token: str, network_requester=None, user_agent: str = UserAgent().random):
-        """Async factory method that ensures state is loaded before returning the instance"""
+        """Async factory method that ensures state data is loaded before returning the instance"""
         instance = cls(domain, token, network_requester, user_agent)
         await instance._load_state_data()
         return instance
 
-    async def _make_request(self, method: str, url: str, **kwargs):
+    async def _make_request(self, method: str, url: str, **kwargs) -> dict | str | bytes:
         if self.network_requester is not None:
             response = await self.network_requester.request(
                 method, url, process_response=self._handle_response, **kwargs
@@ -80,9 +80,6 @@ class OncoEmrIntegration(Integration):
                 response.reason,
             )
         else:
-            r_headers = response.headers
-            # print(r_headers)
-            # msg = r_headers.get("x-message")
             raise IntegrationAPIError(
                 self.integration_name,
                 f"{await response.text()}",
@@ -407,12 +404,6 @@ class OncoEmrIntegration(Integration):
         patient_id = template.patient_id
         note_page = await self._followup_note_page(patient_id=patient_id)
 
-        # soup = self._create_soup(note_page)
-        # nc_start = note_page.find('BEGIN divTABDx/HPI') - 320
-        # nc_end = note_page.find('END divTABFax') + nc_start
-        # note_elem = soup.select_one("div#noteContent")
-        # note_content = note_page[nc_start:nc_end]
-
         existing_data = self._extract_form_data_bs(note_page)
 
         filled_template = self._apply_template_to_dict(
@@ -564,6 +555,133 @@ PRINT
             'success': success,
         }
 
+    async def _patient_info(self, patient_id: str):
+        path = self.url + "/Home/HeaderData"
+        referrer = self.url + "/nav/treatment-plan?PID=" + patient_id
+        headers = self.headers.copy()
+        headers["Referer"] = referrer
+        response = await self._make_request("GET", path, headers=headers)
+
+        if response.get("PatientId") is None or response.get("PatientId") != patient_id:
+            raise IntegrationAPIError(
+                integration_name="oncoemr",
+                status_code=404,
+                message=f"No data found for patient `{patient_id}`"
+            )
+
+        return response
+
+    async def _fetch_patient_orders(self, patient_id: str):
+        path = self.url + f"/{self.group_id}/PatientOrders"
+        referrer = self.url + "/nav/treatment-plan?PID=" + patient_id
+        headers = self.headers.copy()
+        headers["Referer"] = referrer
+
+        response = await self._make_request("GET", path, headers=headers)
+        return response
+
+    async def _fetch_order_types(self):
+        path = self.url + "/Orders/OrderTypes/"
+        response = await self._make_request("GET", path, headers=self.headers)
+        return response
+
+    async def make_order_entry(self, patient_id: str, order_name: str, order_type: str, order_date: str):
+        patient_data = await self._patient_info(patient_id)
+        patient_provider_id = patient_data.get("PrimaryPhysicianId")
+
+        all_physicians = await self._get_physicians()
+        patient_provider = next((item for item in all_physicians if item.get('UserId') == patient_provider_id), None)
+        if patient_provider is None:
+            raise IntegrationAPIError(
+                integration_name="oncoemr",
+                status_code=404,
+                message=f"Failed to find physician for patient `{patient_id}`"
+            )
+
+        location = patient_data.get("SelectedUserLocation").get('LocationId')
+        # patient_orders = await self._fetch_patient_orders(patient_id)
+
+        order_types_list = await self._fetch_order_types()
+        order_types = order_types_list.get('orders')
+        selected_type_list = order_types.get(order_type)
+        selected_type_data = next((item for item in selected_type_list if item.get('Id') == order_name), None)
+        if selected_type_data is None:
+            raise IntegrationAPIError(
+                integration_name="oncoemr",
+                status_code=404,
+                message=f"Failed to find order entry for `{order_name}`"
+            )
+
+        order_details = selected_type_data.get("Details")
+        instructions_data = next((item for item in order_details if item.get('title') == "Instructions"))
+        instructions = instructions_data.get('value')
+
+        try:
+            order_date = datetime.strptime(order_date, "%Y-%m-%d")
+            order_date = order_date.strftime("%Y-%m-%d")
+        except ValueError:
+            raise IntegrationAPIError(
+                integration_name="oncoemr",
+                status_code=400,
+                message=f"Invalid date format passed. Expected: [YYYY-MM-DD]. Received: `{order_date}`"
+            )
+
+        order_model = {
+            'PatientId': f'{patient_id}',
+            'OrderCreationRequests': [
+                {
+                    'Instructions': f'{instructions}<br />',
+                    'OrderType': f'{order_type}',
+                    'Id': f'{order_name}',
+                    'LocationId': f'{location}',
+                    'FlowsheetId': None,
+                    'ICDs': [],
+                    'Dates': [f'{order_date}T12:00:00.000Z'],
+                    'Name': f'{order_name}',
+                    'OrderingPhysicianId': f'{patient_provider_id}',
+                    'OrderingPhysician': {
+                        'id': f'{patient_provider_id}',
+                        'username': f'{patient_provider.get('UserName')}',
+                        'firstName': f'{patient_provider.get("FirstName")}',
+                        'lastName': f'{patient_provider.get("LastName")}',
+                        'displayName': f'{patient_provider.get("LastNameCommaFirstName")}',
+                        'userType': patient_provider.get('UserType'),
+                        'isEnabled': patient_provider.get('IsEnabled'),
+                        'isSuspended': patient_provider.get('IsSuspended'),
+                        'locationId': f'{patient_provider.get("LocationId")}',
+                        'npi': f'{patient_provider.get("Npi")}',
+                        'spi': patient_provider.get('Spi'),
+                        'UserName': f'{patient_provider.get("LastNameCommaFirstName")}',
+                        'UserId': f'{patient_provider_id}'
+                    },
+                    'PlannedDuration': 'P0D',
+                    'ProtocolComponentId': None,
+                    'CptCode': None,
+                    'Quantity': 0,
+                    'StaffMemberUserId': None,
+                    'Value': '',
+                    'DefaultValues': None,
+                    'AdditionalInfo': None,
+                    'ImageId': None,
+                    'ActivityLocation': None,
+                    'ActivityLocationOptions': None
+                }
+            ]
+        }
+        order_query = {
+            "ordersCreationRequestModelJson": json.dumps(order_model),
+        }
+        path = self.url + "/Orders/Orders/"
+        referrer = self.url + "/nav/treatment-plan?PID=" + patient_id
+        headers = self.headers.copy()
+        headers["Referer"] = referrer
+
+        response = await self._make_request("POST", path, headers=headers, json=order_query)
+        if response is None or len(response) == 0:
+            return True
+
+        return False
+
     @staticmethod
     def _verify_note_str(data):
         # The pattern: "background" followed by \u0001, then "DH_" followed by alphanumeric characters,
@@ -575,7 +693,7 @@ PRINT
 
     @staticmethod
     def _apply_template_to_dict(
-            template_model: FollowupNoteTemplateModel|ConsultationNoteTemplateModel,
+            template_model: FollowupNoteTemplateModel | ConsultationNoteTemplateModel,
             target_dict: Dict[str, str],
             radio_buttons_mapping: Dict,
             checkboxes_mapping: Dict,
@@ -661,18 +779,18 @@ PRINT
     def remove_html_tags(text):
         """Removes HTML tags from a string."""
         # Handle <br> specifically if needed, otherwise remove all tags
-        text = text.replace('<br>', '\n').replace('<br>', '\n') # Convert breaks to newlines
+        text = text.replace('<br>', '\n').replace('<br>', '\n')  # Convert breaks to newlines
         clean = re.compile('<.*?>')
-        return re.sub(clean, '', text).strip() # Also strip leading/trailing whitespace
+        return re.sub(clean, '', text).strip()  # Also strip leading/trailing whitespace
 
     @staticmethod
-    def extract_form_data_fd_only(html_string):
+    def _extract_form_data_fd_only(html_string):
         """
         Extracts form data ONLY for elements with IDs starting with 'FD_',
         creating key-value pairs and formatting the result.
         Decodes HTML entities and strips tags from textareas.
         """
-        form_data_dict = {} # Use a dictionary to automatically handle potential duplicates
+        form_data_dict = {}  # Use a dictionary to automatically handle potential duplicates
         # --- Textareas ---
         # Regex captures ID and the raw inner content
         textareas = re.findall(r'<textarea.*?id="([^"]*)".*?>(.*?)</textarea>', html_string, re.DOTALL)
@@ -681,11 +799,12 @@ PRINT
                 # Decode HTML entities (like <) first
                 decoded_value = html.unescape(raw_value)
                 # Remove HTML tags, convert <br> to newline (or remove if not desired)
-                cleaned_value = OncoEmrIntegration.remove_html_tags(decoded_value)
+                cleaned_value = OncoEmrIntegration._remove_html_tags(decoded_value)
                 form_data_dict[id_val] = cleaned_value
         # --- Text Inputs (including hidden-like ones with value) ---
         # Capture type="text" inputs with an ID and potentially a value
-        text_inputs = re.findall(r'<input.*?type="text".*?id="([^"]*)".*?(?:value="([^"]*)")?.*?>', html_string, re.IGNORECASE | re.DOTALL)
+        text_inputs = re.findall(r'<input.*?type="text".*?id="([^"]*)".*?(?:value="([^"]*)")?.*?>', html_string,
+                                 re.IGNORECASE | re.DOTALL)
         for id_val, value in text_inputs:
             # Filter by ID prefix
             if id_val.startswith('FD_'):
@@ -697,11 +816,11 @@ PRINT
         checked_ids = set()
         for match in all_inputs:
             input_tag = match.group(0)
-            id_match = re.search(r'id="(FD_[^"]*)"', input_tag, re.IGNORECASE) # Filter ID here
+            id_match = re.search(r'id="(FD_[^"]*)"', input_tag, re.IGNORECASE)  # Filter ID here
             if id_match:
                 input_id = id_match.group(1)
                 type_match = re.search(r'type="(checkbox|radio)"', input_tag, re.IGNORECASE)
-                if type_match: # It's a checkbox or radio with an FD_ id
+                if type_match:  # It's a checkbox or radio with an FD_ id
                     all_relevant_ids.add(input_id)
                     # Check if 'checked' attribute exists
                     if re.search(r'\schecked(?:=.*?)?(\s|>|/>)', input_tag, re.IGNORECASE):
@@ -719,7 +838,7 @@ PRINT
         return form_data_dict
 
     @staticmethod
-    def remove_html_tags(text):
+    def _remove_html_tags(text):
         """Removes HTML tags from a string, converting <br> to newline."""
         if text is None:
             return ""
@@ -743,19 +862,19 @@ PRINT
             A string formatted as key%01value%02key%01value... or an empty string if no data found.
         """
         soup = BeautifulSoup(full_html_string, 'html.parser')
-        form_data_dict = {} # Use a dictionary to store data (handles potential ID clashes)
+        form_data_dict = {}  # Use a dictionary to store data (handles potential ID clashes)
         # --- Find all relevant elements by ID pattern ---
         # This is more efficient than iterating through ALL tags
         fd_elements = soup.find_all(id=lambda x: x and x.startswith('FD_'))
         for element in fd_elements:
-            element_id = element['id'] # We know ID exists and starts with FD_
+            element_id = element['id']  # We know ID exists and starts with FD_
             tag_name = element.name.lower()
             # --- Textareas ---
             if tag_name == 'textarea':
                 # Use get_text() which handles basic entity decoding and gets text within tags
                 raw_text = element.get_text()
                 # Further clean up <br> and potential leftover tags
-                cleaned_value = OncoEmrIntegration.remove_html_tags(raw_text)
+                cleaned_value = OncoEmrIntegration._remove_html_tags(raw_text)
                 form_data_dict[element_id] = cleaned_value
             # --- Inputs (Text, Checkbox, Radio, Hidden) ---
             elif tag_name == 'input':
