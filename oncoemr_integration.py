@@ -244,15 +244,15 @@ class OncoEmrIntegration(Integration):
         benefit_elem = demo_soup.select_one("span#lblBenefitStatus")
         benefit = benefit_elem.text.strip() if benefit_elem else None
 
-        due_elem = demo_soup.find('td', string='Due')
-        due_value_elem = due_elem.select_one('td.gen_text')
-        due_value = due_value_elem.text.strip() if due_elem else None
-        balance_elem = demo_soup.find('td', string='Balance')
-        balance_value_elem = balance_elem.select_one('td.gen_text')
-        balance_value = balance_value_elem.text.strip() if balance_elem else None
-        copay_elem = demo_soup.find('td', string='CoPay')
-        copay_value_elem = copay_elem.select_one('td.gen_text')
-        copay_value = copay_value_elem.text.strip() if copay_value_elem else None
+        # due_elem = demo_soup.find('td', string='Due')
+        # due_value_elem = due_elem.select_one('td.gen_text')
+        # due_value = due_value_elem.text.strip() if due_elem else None
+        # balance_elem = demo_soup.find('td', string='Balance')
+        # balance_value_elem = balance_elem.select_one('td.gen_text')
+        # balance_value = balance_value_elem.text.strip() if balance_elem else None
+        # copay_elem = demo_soup.find('td', string='CoPay')
+        # copay_value_elem = copay_elem.select_one('td.gen_text')
+        # copay_value = copay_value_elem.text.strip() if copay_value_elem else None
 
         data = {
             "patient_id": patient_id,
@@ -284,9 +284,9 @@ class OncoEmrIntegration(Integration):
             "advance_directive": advance_directive,
             "is_test_patient": demographics.get('isTestPatient'),
             "benefit_status": benefit,
-            "due": due_value,
-            "balance": balance_value,
-            "copay": copay_value,
+            # "due": due_value,
+            # "balance": balance_value,
+            # "copay": copay_value,
             "last_login": status_info.get('lastLogin'),
             "user_id": status_info.get('userId'),
             "email": status_info.get('email'),
@@ -585,6 +585,11 @@ PRINT
         response = await self._make_request("GET", path, headers=self.headers)
         return response
 
+    async def _fetch_order_sets(self):
+        path = self.url + "/Orders/OrderSets/"
+        response = await self._make_request("GET", path, headers=self.headers)
+        return response
+
     async def make_order_entry(self, patient_id: str, order_name: str, order_type: str, order_date: str):
         patient_data = await self._patient_info(patient_id)
         patient_provider_id = patient_data.get("PrimaryPhysicianId")
@@ -597,24 +602,23 @@ PRINT
                 status_code=404,
                 message=f"Failed to find physician for patient `{patient_id}`"
             )
+        parsed_provider = {
+            'id': f'{patient_provider_id}',
+            'username': f'{patient_provider.get('UserName')}',
+            'firstName': f'{patient_provider.get("FirstName")}',
+            'lastName': f'{patient_provider.get("LastName")}',
+            'displayName': f'{patient_provider.get("LastNameCommaFirstName")}',
+            'userType': patient_provider.get('UserType'),
+            'isEnabled': patient_provider.get('IsEnabled'),
+            'isSuspended': patient_provider.get('IsSuspended'),
+            'locationId': f'{patient_provider.get("LocationId")}',
+            'npi': f'{patient_provider.get("Npi")}',
+            'spi': patient_provider.get('Spi'),
+            'UserName': f'{patient_provider.get("LastNameCommaFirstName")}',
+            'UserId': f'{patient_provider_id}'
+        }
 
         location = patient_data.get("SelectedUserLocation").get('LocationId')
-        # patient_orders = await self._fetch_patient_orders(patient_id)
-
-        order_types_list = await self._fetch_order_types()
-        order_types = order_types_list.get('orders')
-        selected_type_list = order_types.get(order_type)
-        selected_type_data = next((item for item in selected_type_list if item.get('Id') == order_name), None)
-        if selected_type_data is None:
-            raise IntegrationAPIError(
-                integration_name="oncoemr",
-                status_code=404,
-                message=f"Failed to find order entry for `{order_name}`"
-            )
-
-        order_details = selected_type_data.get("Details")
-        instructions_data = next((item for item in order_details if item.get('title') == "Instructions"))
-        instructions = instructions_data.get('value')
 
         try:
             order_date = datetime.strptime(order_date, "%Y-%m-%d")
@@ -626,51 +630,161 @@ PRINT
                 message=f"Invalid date format passed. Expected: [YYYY-MM-DD]. Received: `{order_date}`"
             )
 
-        order_model = {
-            'PatientId': f'{patient_id}',
-            'OrderCreationRequests': [
-                {
-                    'Instructions': f'{instructions}<br />',
-                    'OrderType': f'{order_type}',
-                    'Id': f'{order_name}',
-                    'LocationId': f'{location}',
-                    'FlowsheetId': None,
-                    'ICDs': [],
-                    'Dates': [f'{order_date}T12:00:00.000Z'],
-                    'Name': f'{order_name}',
-                    'OrderingPhysicianId': f'{patient_provider_id}',
-                    'OrderingPhysician': {
-                        'id': f'{patient_provider_id}',
-                        'username': f'{patient_provider.get('UserName')}',
-                        'firstName': f'{patient_provider.get("FirstName")}',
-                        'lastName': f'{patient_provider.get("LastName")}',
-                        'displayName': f'{patient_provider.get("LastNameCommaFirstName")}',
-                        'userType': patient_provider.get('UserType'),
-                        'isEnabled': patient_provider.get('IsEnabled'),
-                        'isSuspended': patient_provider.get('IsSuspended'),
-                        'locationId': f'{patient_provider.get("LocationId")}',
-                        'npi': f'{patient_provider.get("Npi")}',
-                        'spi': patient_provider.get('Spi'),
-                        'UserName': f'{patient_provider.get("LastNameCommaFirstName")}',
-                        'UserId': f'{patient_provider_id}'
-                    },
-                    'PlannedDuration': 'P0D',
-                    'ProtocolComponentId': None,
-                    'CptCode': None,
-                    'Quantity': 0,
-                    'StaffMemberUserId': None,
-                    'Value': '',
-                    'DefaultValues': None,
-                    'AdditionalInfo': None,
-                    'ImageId': None,
-                    'ActivityLocation': None,
-                    'ActivityLocationOptions': None
-                }
-            ]
+        type_names = {
+            "Activities": "Activity",
+            "Tests": "Test",
+            "Drugs": "Drug",
+            "Radiology": "Radiology"
         }
-        order_query = {
-            "ordersCreationRequestModelJson": json.dumps(order_model),
-        }
+
+        # logic for order sets
+        if order_type == "OrderSets":
+            order_sets_list = await self._fetch_order_sets()
+            order_sets_list = order_sets_list.get('OrderSets')
+            selected_set: dict = next((item for item in order_sets_list if item.get('Name') == order_name), None)
+
+            if selected_set is None:
+                raise IntegrationAPIError(
+                    integration_name="oncoemr",
+                    status_code=404,
+                    message=f"Failed to find order set `{order_name}`"
+                )
+
+            set_orders = {
+                type_names['Activities']: selected_set.get('Activities'),
+                type_names['Tests']: selected_set.get('Tests'),
+                type_names['Drugs']: selected_set.get('Drugs'),
+                type_names['Radiology']: selected_set.get('Radiology')
+            }
+
+            order_models = []
+            for type_name, type_list in set_orders.items():
+                for each in type_list:
+                    cpt_code = next(
+                        (item.get('value') for item in each.get('Details') if item.get('title') == 'CPT Code'), None
+                    )
+                    instr = next(
+                        (item.get('value') for item in each.get('Details') if item.get('title') == 'Instructions'), None
+                    )
+                    finance = next(
+                        (item.get('value') for item in each.get('Details') if item.get('title') == 'Financial'), None
+                    )
+                    dcc = next(
+                        (item.get('value') for item in each.get('Details') if item.get('title') == 'Delivery CPT code'),
+                        None
+                    )
+                    dcq = next(
+                        (item.get('value') for item in each.get('Details') if item.get('title') == 'Delivery CPT quantity'),
+                        None
+                    )
+
+                    t_locs = next(
+                        (item for item in each.get('Details') if item.get('title') == 'Location'), None
+                    )
+                    if t_locs:
+                        t_loc_options = [option['value'] for option in t_locs['options']]
+                    else:
+                        t_loc_options = None
+
+                    spec_type = next(
+                        (item.get('value') for item in each.get('Details') if item.get('title') == 'Specimen type'),
+                        None
+                    )
+
+                    model = {
+                        'Billable': True if finance == "Billable" else False,
+                        'CptCode': cpt_code,
+                        'Dates': [f'{order_date}T12:00:00.000Z'],
+                        'DefaultValues': None,
+                        'DeliveryCptCode': dcc,
+                        'DeliveryQuantity': dcq,
+                        'FlowsheetId': None,
+                        'Frequency': None,
+                        'FrequencyOptions': None,
+                        'ICDs': [],
+                        'Id': f'{each.get("Id")}_{selected_set.get("Id")}',
+                        'Instructions': f'{instr}<br />',
+                        'IsNgsTest': each.get('IsNgsTest'),
+                        'LocationId': f'{location}',
+                        'Name': each.get('Id'),
+                        'NgsTestRequest': None,
+                        'NgsTestVendor': None,
+                        'OrderSetName': f'{order_name}',
+                        'OrderType': type_name,
+                        'OrderingPhysician': parsed_provider,
+                        'OrderingPhysicianId': f'{patient_provider_id}',
+                        'PlannedDuration': None,
+                        'ProtocolComponentId': None,
+                        'ProviderIdList': [],
+                        'ProviderList': [],
+                        'Quantity': '1',
+                        'RequisitionNumber': '',
+                        'ShowProviders': True,
+                        'TestId': None,
+                        'TestLocation': t_locs.get('value') if t_locs is not None else None,
+                        'TestLocationOptions': t_loc_options,
+                        'Unit': spec_type.get('Value') if spec_type is not None else None,
+                        'Value': None
+                    }
+                    order_models.append(model)
+
+            base_query = {
+                "PatientId": patient_id,
+                "OrderCreationRequests": order_models,
+                "FlowsheetToBeCreated": order_name
+            }
+            order_query = {
+                "ordersCreationRequestModelJson": json.dumps(base_query),
+            }
+
+        else:
+            order_types_list = await self._fetch_order_types()
+            order_types = order_types_list.get('orders')
+            selected_type_list = order_types.get(order_type)
+            selected_type_data = next((item for item in selected_type_list if item.get('Id') == order_name), None)
+            if selected_type_data is None:
+                raise IntegrationAPIError(
+                    integration_name="oncoemr",
+                    status_code=404,
+                    message=f"Failed to find order entry for `{order_name}`"
+                )
+
+            order_details = selected_type_data.get("Details")
+            instructions_data = next((item for item in order_details if item.get('title') == "Instructions"))
+            instructions = instructions_data.get('value')
+
+            order_model = {
+                'PatientId': f'{patient_id}',
+                'OrderCreationRequests': [
+                    {
+                        'Instructions': f'{instructions}<br />',
+                        'OrderType': type_names.get(order_type),
+                        'Id': f'{order_name}',
+                        'LocationId': f'{location}',
+                        'FlowsheetId': None,
+                        'ICDs': [],
+                        'Dates': [f'{order_date}T12:00:00.000Z'],
+                        'Name': f'{order_name}',
+                        'OrderingPhysicianId': f'{patient_provider_id}',
+                        'OrderingPhysician': parsed_provider,
+                        'PlannedDuration': 'P0D',
+                        'ProtocolComponentId': None,
+                        'CptCode': None,
+                        'Quantity': 0,
+                        'StaffMemberUserId': None,
+                        'Value': '',
+                        'DefaultValues': None,
+                        'AdditionalInfo': None,
+                        'ImageId': None,
+                        'ActivityLocation': None,
+                        'ActivityLocationOptions': None
+                    }
+                ]
+            }
+            order_query = {
+                "ordersCreationRequestModelJson": json.dumps(order_model),
+            }
+
         path = self.url + "/Orders/Orders/"
         referrer = self.url + "/nav/treatment-plan?PID=" + patient_id
         headers = self.headers.copy()
@@ -678,9 +792,118 @@ PRINT
 
         response = await self._make_request("POST", path, headers=headers, json=order_query)
         if response is None or len(response) == 0:
-            return True
+            return {
+                "success": True,
+            }
 
-        return False
+        return {
+            "success": False,
+        }
+
+    async def search_patient_by_names(self, first_name: str, last_name: str) -> list[dict]:
+        params = {
+            'Length': '0',
+        }
+        data = {
+            'oFindPatient.sResource': '-1',
+            'oFindPatient.bTodayOnly': 'False',
+            'oFindPatient.sLastName': f'{last_name}',
+            'oFindPatient.sFirstName': f'{first_name}',
+            'oFindPatient.sPatientNumber': '',
+            'oFindPatient.sDOB': '',
+            'oFindPatient.sSSN': '',
+            'oFindPatient.sPhone': '',
+            'oFindPatient.sReferringMD': '',
+            'oFindPatient.sGuarantor': '',
+            'oFindPatient.sPolicy': '',
+            'oFindPatient.sPhysician': '',
+            'oFindPatient.sEmail': '',
+            'X-Requested-With': 'XMLHttpRequest',
+        }
+        path = self.url + "/FindPatient/GetPatientList"
+        response = await self._make_request("POST", path, params=params, data=data, headers=self.headers)
+        view_html = response.get("sViewHtml")
+
+        found_patients = self._parse_patient_search(view_html)
+        return found_patients
+
+    @staticmethod
+    def _parse_patient_search(html_content):
+        """
+        Parses HTML content containing a patient table (#tblPatientList)
+        and extracts patient details.
+
+        Args:
+            html_content: A string containing the HTML source.
+
+        Returns:
+            A list of dictionaries, where each dictionary represents a patient
+            with keys: 'name', 'dob', 'mrn', 'supervising_md', 'patient_id', 'anchor_mrn'.
+            Returns an empty list if the table is not found or has no data.
+        """
+        soup = OncoEmrIntegration._create_soup(html_content)
+        patient_list = []
+
+        # Find the table by its ID
+        table = soup.find('table', id='tblPatientList')
+        if not table:
+            print("Table with id 'tblPatientList' not found.")
+            return patient_list
+
+        # Find the table body
+        tbody = table.find('tbody')
+        if not tbody:
+            print("Table body 'tbody' not found.")
+            return patient_list
+
+        # Find all table rows within the body
+        rows = tbody.find_all('tr')
+
+        # Regular expression to extract the patient ID from the onclick attribute
+        onclick_pattern = re.compile(r'selectPatient\("([^"]+)"')
+
+        for row in rows:
+            cells = row.find_all('td')
+            if len(cells) == 4: # Ensure we have the expected number of columns
+                try:
+                    # --- Name and IDs (from the first cell's <a> tag) ---
+                    name_anchor = cells[0].find('a')
+                    name = name_anchor.get_text(strip=True) if name_anchor else None
+                    anchor_mrn = name_anchor.get('mrn') if name_anchor else None
+                    patient_id = None
+                    if name_anchor and name_anchor.get('onclick'):
+                        match = onclick_pattern.search(name_anchor['onclick'])
+                        if match:
+                            patient_id = match.group(1)
+
+                    # --- DOB (from the second cell) ---
+                    dob_raw = cells[1].get_text(strip=True)
+                    dob = dob_raw if dob_raw and dob_raw != ' ' else None
+
+                    # --- MRN (from the third cell) ---
+                    mrn_raw = cells[2].get_text(strip=True)
+                    mrn = mrn_raw if mrn_raw and mrn_raw != ' ' else None
+
+                    # --- Supervising MD (from the fourth cell) ---
+                    md_raw = cells[3].get_text(strip=True)
+                    supervising_md = md_raw if md_raw and md_raw != ' ' else None # Handle empty MD field
+
+                    patient_data = {
+                        'name': name,
+                        'dob': dob,
+                        'mrn': mrn,
+                        'supervising_md': supervising_md,
+                        'patient_id': patient_id, # Extracted from onclick
+                        'anchor_mrn': anchor_mrn  # Extracted from <a> tag's MRN attribute
+                    }
+                    patient_list.append(patient_data)
+                except Exception as e:
+                    print(f"Error processing row: {row}. Error: {e}")
+            else:
+                print(f"Skipping row with unexpected number of cells ({len(cells)}): {row}")
+
+
+        return patient_list
 
     @staticmethod
     def _verify_note_str(data):
