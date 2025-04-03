@@ -23,7 +23,8 @@ from submodule_integrations.oncoemr.oncoemr_mapping import FOLLOWUP_TEXTFIELDS_M
 
 
 class OncoEmrIntegration(Integration):
-    def __init__(self, domain: str, token: str, network_requester=None, user_agent: str = UserAgent().random):
+    def __init__(self, domain: str, token: str, location_id: str, network_requester=None,
+                 user_agent: str = UserAgent().random):
         super().__init__("oncoemr")
         self.user_agent = user_agent
         self.url = domain if "https://" in domain else f"https://{domain}"
@@ -39,11 +40,19 @@ class OncoEmrIntegration(Integration):
 
         self.user_id = None
         self.group_id = None
+        self.location_id = location_id
 
     @classmethod
-    async def create(cls, domain: str, token: str, network_requester=None, user_agent: str = UserAgent().random):
+    async def create(cls, domain: str, token: str, location_id: str, network_requester=None,
+                     user_agent: str = UserAgent().random):
         """Async factory method that ensures state data is loaded before returning the instance"""
-        instance = cls(domain, token, network_requester, user_agent)
+        instance = cls(
+            domain=domain,
+            token=token,
+            location_id=location_id,
+            network_requester=network_requester,
+            user_agent=user_agent,
+        )
         await instance._load_state_data()
         return instance
 
@@ -97,6 +106,16 @@ class OncoEmrIntegration(Integration):
         self.user_id = data.get("userId")
         self.group_id = data.get("groupId")
 
+    async def _verify_patient_exists(self, patient_id: str):
+        patient_status = await self._patient_status_info(patient_id=patient_id)
+        if patient_status.get('id') is None:
+            raise IntegrationAPIError(
+                integration_name=self.integration_name,
+                error_code="not_found",
+                status_code=404,
+                message=f"Patient not found for ID: `{patient_id}`",
+            )
+
     async def _get_physicians(self) -> List[Dict]:
         path = self.url + "/User/PhysicianUsers"
         headers = self.headers.copy()
@@ -121,26 +140,29 @@ class OncoEmrIntegration(Integration):
 
         return processed
 
-    async def fetch_visit_list(self, doctor_id: str):
+    async def fetch_visit_list(self, doctor_id: str, selected_date: str | None):
+        doctors_list = await self.fetch_physicians()
+        this_doctor = next((doctor for doctor in doctors_list if doctor.get("id") == doctor_id), None)
+        if this_doctor is None:
+            raise IntegrationAPIError(
+                integration_name=self.integration_name,
+                error_code="not_found",
+                status_code=404,
+                message=f"Doctor not found for ID: `{doctor_id}",
+            )
+
         path = f"{self.url}/VisitList/UpdateVisitList"
 
+        if selected_date is None:
+            selected_date = self._get_current_date()
+
         first_param = {
-            'sVisitDate': f'{self._get_current_date()}',
-            'sLocID': 'LH_0656Z562B7MPBVX00BWM,LH_Jz650539279_231,LH_05VZHYDQDHE9Q8ZR6JVR,LH_05WTYN7QPR6Z278Q3JJ5,'
-                      'LH_05ZX251VZCCD1JQ4ZGPA,LH_05W6RDMVZC3VHKW66PG8,LH_066125GZ9C5TB1BYZ1Y4,LID_11,'
-                      'LH_066MF8G1VDJ9QYREXY3S,LH_05XWNAJ0B7XFCNHBTHY8,LH_066MF7RTY4TKERW6BSCR,LH_Dz114987565_14,'
-                      'LH_05WTXV0QP8BGANTZ7CXE,LH_05Y2K2AGQ14EACKY9W1Z,LH_065JAJHQTD1624H1W3A7,'
-                      'LH_066EYKHVYP8N4YKDD1X6,LH_0676CF8XHFBE7VRWW5DK,LH_0676CBZG9MX4J8BQB54N,LH_Az592719580_14,'
-                      'LH_05W6RF8TKNYPJCTWQCWF,LH_069D7FCGHG444ETPFNGS,LH_0697Q1JKWQW88CEBMNQT,'
-                      'LH_069Z6WFMJFNK5R71AFT2,LH_0697R6W8XN9NCB8Y9MGJ,LH_0697Q3PJHWN3B11CM23H,'
-                      'LH_069D7M9KXA4BGKQE6WQ7,LH_068MR68N5Q16W5ND0GZJ,LH_068EYQBFEVMJ5538KQ7W,'
-                      'LH_069MQSC6JHA99GBWZE6N,LH_069MQT2FJW2AGQKV88NZ,LH_068Y7NK5CB11V1FAWKG0,'
-                      'LH_068MR7BE0MW3VKWVNNZW,LH_068MR8V261CJ4PYA7CDQ,LH_068N3K1Q1MTVK8DC8QVJ,'
-                      'LH_068MR97AR0VNHM3A7HMB,LH_069BNGP94KBQE1GNGY9X,LH_069G4REM396V056SQZZZ',
+            'sVisitDate': f'{selected_date}',
+            'sLocID': -1,
             'sResource': f'{doctor_id}',
             'bNewLocation': False,
             'bNewResource': True,
-            'sMDUID': '',
+            'sMDUID': f'{doctor_id}',
             'bShowPatLocCol': 'True',
             'bMDVisitsOnly': 'True',
             'bHideUnscheduled': 'True',
@@ -212,7 +234,7 @@ class OncoEmrIntegration(Integration):
     async def _patient_demographics_html(self, patient_id: str) -> str:
         params = {
             'PID': f'{patient_id}',
-            'locationId': 'LH_0656Z562B7MPBVX00BWM',
+            'locationId': f'{self.location_id}',
             '_PP': '1',
             '_': str(int(time.time() * 1000)),
         }
@@ -221,8 +243,16 @@ class OncoEmrIntegration(Integration):
         return response
 
     async def fetch_patient_demographics(self, patient_id: str):
+        await self._verify_patient_exists(patient_id=patient_id)
+
         demographics = await self._basic_patient_demographics_data(patient_id)
         status_info = await self._patient_status_info(patient_id)
+
+        if demographics is None:
+            return {
+                "success": False,
+                "message": f"No patient found with ID: `{patient_id}`",
+            }
 
         demo_html = await self._patient_demographics_html(patient_id)
         demo_soup = self._create_soup(demo_html)
@@ -243,16 +273,6 @@ class OncoEmrIntegration(Integration):
         status = status_elem.text.strip() if status_elem else None
         benefit_elem = demo_soup.select_one("span#lblBenefitStatus")
         benefit = benefit_elem.text.strip() if benefit_elem else None
-
-        # due_elem = demo_soup.find('td', string='Due')
-        # due_value_elem = due_elem.select_one('td.gen_text')
-        # due_value = due_value_elem.text.strip() if due_elem else None
-        # balance_elem = demo_soup.find('td', string='Balance')
-        # balance_value_elem = balance_elem.select_one('td.gen_text')
-        # balance_value = balance_value_elem.text.strip() if balance_elem else None
-        # copay_elem = demo_soup.find('td', string='CoPay')
-        # copay_value_elem = copay_elem.select_one('td.gen_text')
-        # copay_value = copay_value_elem.text.strip() if copay_value_elem else None
 
         data = {
             "patient_id": patient_id,
@@ -314,7 +334,7 @@ class OncoEmrIntegration(Integration):
     async def _get_all_notes(self, patient_id: str) -> list[dict]:
         params = {
             "PID": patient_id,
-            "locationId": "LH_0656Z562B7MPBVX00BWM",
+            "locationId": f"{self.location_id}",
             "_PP": 1,
             "_": str(int(time.time() * 1000)),
         }
@@ -371,6 +391,8 @@ class OncoEmrIntegration(Integration):
         }
 
     async def fetch_patient_notes(self, patient_id: str):
+        await self._verify_patient_exists(patient_id=patient_id)
+
         notes = await self._get_all_notes(patient_id)
         note_files = []
 
@@ -402,6 +424,8 @@ class OncoEmrIntegration(Integration):
 
     async def make_followup_note(self, template: FollowupNoteTemplateModel):
         patient_id = template.patient_id
+        await self._verify_patient_exists(patient_id=patient_id)
+
         note_page = await self._followup_note_page(patient_id=patient_id)
 
         existing_data = self._extract_form_data_bs(note_page)
@@ -451,7 +475,17 @@ PRINT
         path = self.url + "/VisitNotes/AutoSaveVisitNote"
         response = await self._make_request("POST", path, json=query_json, headers=headers)
 
-        return self._verify_note_str(response)
+        if self._verify_note_str(response):
+            return {
+                "success": True,
+            }
+        else:
+            raise IntegrationAPIError(
+                integration_name=self.integration_name,
+                status_code=500,
+                error_code="server_error",
+                message=f"Failed to process note: {response}",
+            )
 
     async def _initial_consultation_note_page(self, patient_id: str):
         path = self.url + "//WebForms/PD_DocOncoNoteDB.aspx"
@@ -466,6 +500,8 @@ PRINT
 
     async def make_consultation_note(self, template: ConsultationNoteTemplateModel):
         patient_id = template.patient_id
+        await self._verify_patient_exists(patient_id=patient_id)
+
         note_page = await self._initial_consultation_note_page(patient_id=patient_id)
 
         existing_data = self._extract_form_data_bs(note_page)
@@ -514,7 +550,17 @@ PRINT
         path = self.url + "/VisitNotes/AutoSaveVisitNote"
         response = await self._make_request("POST", path, json=query_json, headers=headers)
 
-        return self._verify_note_str(response)
+        if self._verify_note_str(response):
+            return {
+                "success": True,
+            }
+        else:
+            raise IntegrationAPIError(
+                integration_name=self.integration_name,
+                status_code=500,
+                error_code="server_error",
+                message=f"Failed to process note: {response}",
+            )
 
     async def _get_icd10_code_data(self, code: str):
         params = {
@@ -530,6 +576,8 @@ PRINT
         return this_data
 
     async def set_icd10_code(self, patient_id: str, code: str, add_type: str):
+        await self._verify_patient_exists(patient_id=patient_id)
+
         code = code.upper()
         code_data = await self._get_icd10_code_data(code)
         if code_data is None:
@@ -591,6 +639,8 @@ PRINT
         return response
 
     async def make_order_entry(self, patient_id: str, order_name: str, order_type: str, order_date: str):
+        await self._verify_patient_exists(patient_id=patient_id)
+
         patient_data = await self._patient_info(patient_id)
         patient_provider_id = patient_data.get("PrimaryPhysicianId")
 
@@ -674,7 +724,8 @@ PRINT
                         None
                     )
                     dcq = next(
-                        (item.get('value') for item in each.get('Details') if item.get('title') == 'Delivery CPT quantity'),
+                        (item.get('value') for item in each.get('Details') if
+                         item.get('title') == 'Delivery CPT quantity'),
                         None
                     )
 
@@ -800,7 +851,7 @@ PRINT
             "success": False,
         }
 
-    async def search_patient_by_names(self, first_name: str, last_name: str) -> list[dict]:
+    async def search_patient_by_names(self, first_name: str = "", last_name: str = "", mrn: str = "") -> list[dict]:
         params = {
             'Length': '0',
         }
@@ -809,7 +860,7 @@ PRINT
             'oFindPatient.bTodayOnly': 'False',
             'oFindPatient.sLastName': f'{last_name}',
             'oFindPatient.sFirstName': f'{first_name}',
-            'oFindPatient.sPatientNumber': '',
+            'oFindPatient.sPatientNumber': f'{mrn}',
             'oFindPatient.sDOB': '',
             'oFindPatient.sSSN': '',
             'oFindPatient.sPhone': '',
@@ -825,6 +876,20 @@ PRINT
         view_html = response.get("sViewHtml")
 
         found_patients = self._parse_patient_search(view_html)
+
+        if len(mrn) != 0:
+            exact_patient = next((patient for patient in found_patients if patient.get('mrn') == mrn), None)
+            # don't return full list if mrn is specified and not found
+            if exact_patient is None:
+                raise IntegrationAPIError(
+                    integration_name=self.integration_name,
+                    status_code=404,
+                    error_code='not_found',
+                    message=f"No patient found with MRN: `{mrn}`"
+                )
+
+            found_patients = [exact_patient]
+
         return found_patients
 
     @staticmethod
@@ -864,7 +929,7 @@ PRINT
 
         for row in rows:
             cells = row.find_all('td')
-            if len(cells) == 4: # Ensure we have the expected number of columns
+            if len(cells) == 4:  # Ensure we have the expected number of columns
                 try:
                     # --- Name and IDs (from the first cell's <a> tag) ---
                     name_anchor = cells[0].find('a')
@@ -886,14 +951,14 @@ PRINT
 
                     # --- Supervising MD (from the fourth cell) ---
                     md_raw = cells[3].get_text(strip=True)
-                    supervising_md = md_raw if md_raw and md_raw != ' ' else None # Handle empty MD field
+                    supervising_md = md_raw if md_raw and md_raw != ' ' else None  # Handle empty MD field
 
                     patient_data = {
                         'name': name,
                         'dob': dob,
                         'mrn': mrn,
                         'supervising_md': supervising_md,
-                        'patient_id': patient_id, # Extracted from onclick
+                        'patient_id': patient_id,  # Extracted from onclick
                         'anchor_mrn': anchor_mrn  # Extracted from <a> tag's MRN attribute
                     }
                     patient_list.append(patient_data)
@@ -901,7 +966,6 @@ PRINT
                     print(f"Error processing row: {row}. Error: {e}")
             else:
                 print(f"Skipping row with unexpected number of cells ({len(cells)}): {row}")
-
 
         return patient_list
 
