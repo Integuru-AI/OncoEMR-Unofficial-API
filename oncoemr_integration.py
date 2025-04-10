@@ -107,14 +107,21 @@ class OncoEmrIntegration(Integration):
         self.group_id = data.get("groupId")
 
     async def _verify_patient_exists(self, patient_id: str):
+        patient_basic_info = await self._patient_partial_page_info(patient_id=patient_id)
+        header_data = patient_basic_info.get('HeaderData')
+        if header_data.get('PatientMrn') or header_data.get('PatientDisplayName'):
+            return
+
         patient_status = await self._patient_status_info(patient_id=patient_id)
-        if patient_status.get('id') is None:
-            raise IntegrationAPIError(
-                integration_name=self.integration_name,
-                error_code="not_found",
-                status_code=404,
-                message=f"Patient not found for ID: `{patient_id}`",
-            )
+        if patient_status.get('id'):
+            return
+
+        raise IntegrationAPIError(
+            integration_name=self.integration_name,
+            error_code="not_found",
+            status_code=404,
+            message=f"Patient not found for ID: `{patient_id}`",
+        )
 
     async def _get_physicians(self) -> List[Dict]:
         path = self.url + "/User/PhysicianUsers"
