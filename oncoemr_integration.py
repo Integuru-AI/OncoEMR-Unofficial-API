@@ -435,6 +435,13 @@ class OncoEmrIntegration(Integration):
 
         note_page = await self._followup_note_page(patient_id=patient_id)
 
+        note_soup = self._create_soup(note_page)
+        note_guid_elem = note_soup.select_one('input#txtNoteGUID')
+        note_guid = note_guid_elem.get('value')
+
+        note_form_id_elem = note_soup.select_one('input#txtFormID')
+        note_form_id = note_form_id_elem.get('value')
+
         existing_data = self._extract_form_data_bs(note_page)
 
         filled_template = self._apply_template_to_dict(
@@ -448,22 +455,22 @@ class OncoEmrIntegration(Integration):
         output_string = "%02".join(output_parts)
 
         param_string = f"""
-DH_06AX3GVPM7CS4W5F04JE%02
-DH_06AX3GVPM7CS4W5F04JE%02
+%02
+%02
 AsteraMedOncFollowUp-2023v9%02
 Astera MedOnc Follow Up - 2023 v8%02
 {self._get_current_date()}%02
-DO_06APW5AY04PK7CHWD1EP%02
+{note_form_id}%02
 background%02
-%02
-%02
+Astera MedOnc Follow Up - 2023 v8%02
+{self._get_current_date()}%02
 %02
 {self.group_id}%02
 {patient_id}%02
 %02
 %02
 PRINT%02
-Note_06AX3GT91YY56XMHP3B1%02
+{note_guid}%02
 MD Visit Note%02
 {output_string}%02
 PRINT
@@ -511,6 +518,13 @@ PRINT
 
         note_page = await self._initial_consultation_note_page(patient_id=patient_id)
 
+        note_soup = self._create_soup(note_page)
+        note_guid_elem = note_soup.select_one('input#txtNoteGUID')
+        note_guid = note_guid_elem.get('value')
+
+        note_form_id_elem = note_soup.select_one('input#txtFormID')
+        note_form_id = note_form_id_elem.get('value')
+
         existing_data = self._extract_form_data_bs(note_page)
         filled_template = self._apply_template_to_dict(
             template_model=template,
@@ -523,22 +537,22 @@ PRINT
         output_string = "%02".join(output_parts)
 
         param_string = f"""
-DH_06AXJ5SRQMK8MFDGXC7C%02
-DH_06AXJ5SRQMK8MFDGXC7C%02
+%02
+%02
 AsteraMedOncInitialConsultation-2023v3%02
 Astera MedOnc Initial Consultation - 2023 v3%02
 {self._get_current_date()}%02
-DO_06APW5G421SENZ2PR3XB%02
+{note_form_id}%02
 background%02
-%02
-%02
+Astera MedOnc Initial Consultation - 2023 v3%02
+{self._get_current_date()}%02
 %02
 {self.group_id}%02
 {patient_id}%02
 %02
 %02
 PRINT%02
-Note_06AXJ5QEZ8CM48J7XA14%02
+{note_guid}%02
 MD Visit Note%02
 {output_string}%02
 PRINT
