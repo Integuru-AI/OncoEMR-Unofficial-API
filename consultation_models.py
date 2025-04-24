@@ -12,34 +12,52 @@ class FieldContent(BaseModel):
 # --- Literal Type Definitions ---
 
 # Reused Literals (Define or import these from a shared location if unifying later)
-MaritalStatusOptions = Literal["Single", "Married", "Divorced", "Widowed", "Has Significant Other"]
+MaritalStatusOptions = Literal[
+    "Single", "Married", "Divorced", "Widowed", "Has Significant Other"
+]
 ROSWeightOptions = Literal["No Weight Loss", "Weight Loss"]
 ROSFatigueOptions = Literal["No Fatigue", "Fatigue"]
 ROSAppetiteOptions = Literal["No Loss of Appetite", "Loss of Appetite"]
 ROSNightSweatsOptions = Literal["No night sweats", "Night sweats"]
 ROSFeverOptions = Literal["No fever", "Fever"]
 ROSChillsOptions = Literal["No Chills", "Chills"]
-AssessmentStatusOptions = Literal["NED", "Stable", "Partial Response", "Complete Response", "Progression of Disease"]
+AssessmentStatusOptions = Literal[
+    "NED", "Stable", "Partial Response", "Complete Response", "Progression of Disease"
+]
 ACPLivingWillOptions = Literal["Yes", "No", "Unknown"]
 ACPPOAOptions = Literal["Yes", "No", "Unknown"]
 ACPPOLSTOptions = Literal["Yes", "No", "Unknown"]
 ACPDNROptions = Literal["Yes", "No", "Unknown"]
 ACPGoalOfCareOptions = Literal["Palliative", "Curative", "Hospice"]
 PainScaleOptions = Literal[
-    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]  # Keep for model clarity, mapping ignored
-ECOGScaleOptions = Literal["0", "1", "2", "3", "4"]  # Keep for model clarity, mapping ignored
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"
+]  # Keep for model clarity, mapping ignored
+ECOGScaleOptions = Literal[
+    "0", "1", "2", "3", "4"
+]  # Keep for model clarity, mapping ignored
 
 # --- Consultation Specific Literals ---
 ConsultationTobaccoStatusOptions = Literal[
-    "1 Current Everyday Smoker", "2 Current Some Day Smoker", "3 Former Smoker",
-    "4 Never Smoker", "5 Smoker, Current Status Unknown", "9 Unknown If Ever Smoked"
+    "1 Current Everyday Smoker",
+    "2 Current Some Day Smoker",
+    "3 Former Smoker",
+    "4 Never Smoker",
+    "5 Smoker, Current Status Unknown",
+    "9 Unknown If Ever Smoked",
 ]
 ConsultationSmokingCessationOptions = Literal[
-    "Not Discussed", "Advised to Quit", "Discussed Cessation Methods", "Discussed Cessation Medications"
+    "Not Discussed",
+    "Advised to Quit",
+    "Discussed Cessation Methods",
+    "Discussed Cessation Medications",
 ]
 ConsultationFamilyCancerHistoryOptions = Literal["Yes", "None"]
-ConsultationOtherFamilyHistoryOptions = Literal["Other Family History"]  # Single radio option
-SHAlcoholUseStatusOptions = Literal["Not Asked", "Never", "Currently uses", "Former use"]
+ConsultationOtherFamilyHistoryOptions = Literal[
+    "Other Family History"
+]  # Single radio option
+SHAlcoholUseStatusOptions = Literal[
+    "Not Asked", "Never", "Currently uses", "Former use"
+]
 SHDrugUseStatusOptions = Literal["Negative", "Positive"]
 YesNoOptions = Literal["Yes", "No"]  # Helper
 
@@ -65,7 +83,9 @@ ROSRespSputumOptions = Literal["No Sputum Production", "Sputum Production"]
 ROSRespHemoptysisOptions = Literal["No Hemoptysis", "Hemoptysis"]
 ROSRespSOBOptions = Literal["No Shortness of Breath", "Shortness of Breath"]
 ROSRespOrthopneaOptions = Literal["No Orthopnea", "Orthopnea"]
-ROSRespNPDOptions = Literal["No Nocturnal Paroxysmal Dyspnea", "Nocturnal Paroxysmal Dyspnea"]
+ROSRespNPDOptions = Literal[
+    "No Nocturnal Paroxysmal Dyspnea", "Nocturnal Paroxysmal Dyspnea"
+]
 ROSGINauseaOptions = Literal["No Nausea", "Nausea"]
 ROSGIVomitingOptions = Literal["No Vomiting", "Vomiting"]
 ROSGIHeartburnOptions = Literal["No Heartburn", "Heartburn"]
@@ -85,7 +105,9 @@ ROSMSKStiffnessOptions = Literal["No Stiffness", "Stiffness"]
 ROSMSKJointPainOptions = Literal["No Joint Pain", "Joint Pain"]
 ROSMSKJointSwellingOptions = Literal["No joint swelling", "Joint swelling"]
 ROSMSKBackPainOptions = Literal["No Back Pain", "Back Pain"]
-ROSSkinStatusOptions = Literal["Not Asked", "No skin rash(es)", "Skin Rash", "Other skin complaints"]
+ROSSkinStatusOptions = Literal[
+    "Not Asked", "No skin rash(es)", "Skin Rash", "Other skin complaints"
+]
 ROSNeuroHeadacheOptions = Literal["No Headaches", "Headaches"]
 ROSNeuroSeizureOptions = Literal["No Seizures", "Seizures"]
 ROSNeuroDizzinessOptions = Literal["No Dizziness", "Dizziness"]
@@ -108,15 +130,25 @@ ROSHemeLumpsGroinOptions = Literal["No Lumps in Groin", "Lumps in Groin"]
 
 # PE Literals
 PEChaperoneOptions = Literal["Accepted", "Declined"]
-PEGeneralNutritionOptions = Literal["Well developed, well nourished", "Malnourished/cachectic"]
-PEGeneralDistressOptions = Literal["No acute Distress", "Acutely ill-looking", "Chronicly Ill looking"]
+PEGeneralNutritionOptions = Literal[
+    "Well developed, well nourished", "Malnourished/cachectic"
+]
+PEGeneralDistressOptions = Literal[
+    "No acute Distress", "Acutely ill-looking", "Chronicly Ill looking"
+]
 PEGeneralAgeAppearanceOptions = Literal["Appears Stated age", "Elderly appearance"]
-PEHeadTraumaOptions = Literal["Atraumatic and normocephalic", "Traumatic with a wound/scar on the scalp/face."]
+PEHeadTraumaOptions = Literal[
+    "Atraumatic and normocephalic", "Traumatic with a wound/scar on the scalp/face."
+]
 PEEyesPERRLAOptions = Literal["PERRLA", "Unequal"]
-PEEyesConjunctivaColorOptions = Literal["Pink palpebral conjunctivae", "Slightly pale palpebral conjunctivae"]
+PEEyesConjunctivaColorOptions = Literal[
+    "Pink palpebral conjunctivae", "Slightly pale palpebral conjunctivae"
+]
 PEEyesEOMOptions = Literal["EOMs intact", "Deviation"]
 PEEyesScleraOptions = Literal["No icteric sclera", "Icteric sclera"]
-PEEyesConjunctivaClarityOptions = Literal["Conjunctiva Clear", "Conjunctiva red/drainage"]
+PEEyesConjunctivaClarityOptions = Literal[
+    "Conjunctiva Clear", "Conjunctiva red/drainage"
+]
 PEENMTTracheaOptions = Literal["Trachea Midline", "Deviated trachea"]
 PEENMTJVDOptions = Literal["NO JVD", "Engorged jugular vessels"]
 PEENMTLymphadenopathyOptions = Literal["No Lymphadenopathy", "Lymphadenopathy"]
@@ -129,10 +161,16 @@ PECardiacBruitsOptions = Literal["No bruits", "Bruits"]
 PECardiacRhythmOptions = Literal["Regular heart beat", "Atrial fibrillation"]
 PECardiacHeaveOptions = Literal["No parasternal heave", "Parasternal Heave"]
 PECardiacRadialPulseOptions = Literal["Radial Pulse Present", "Radial pulses absent"]
-PECardiacFemoralPulseOptions = Literal["Femoral Pulses present", "Femoral pulses absent"]
+PECardiacFemoralPulseOptions = Literal[
+    "Femoral Pulses present", "Femoral pulses absent"
+]
 PECardiacPedalPulseOptions = Literal["Pedal Pulses present", "Pedal Pulses absent"]
-PERespAuscultationOptions = Literal["Clear, No rales/Rhonchi", "Rales/Rhonchi present", "Pleural Effusion"]
-PERespPercussionPalpationOptions = Literal["Percussion and palpation-Normal", "Percussion and palpation abnormal"]
+PERespAuscultationOptions = Literal[
+    "Clear, No rales/Rhonchi", "Rales/Rhonchi present", "Pleural Effusion"
+]
+PERespPercussionPalpationOptions = Literal[
+    "Percussion and palpation-Normal", "Percussion and palpation abnormal"
+]
 PEGIFirmnessOptions = Literal["Abdomen soft", "Abdomen firmness"]
 PEGITendernessOptions = Literal["Abdomen non-tender", "Abdomen Tender"]
 PEGIDistensionOptions = Literal["Abdomen non-distended", "Abdomen Distended"]
@@ -150,14 +188,20 @@ PEMSKStatureOptions = Literal["Stature Normal", "Loss of Stature"]
 PEExtremitiesStatusOptions = Literal["Not examined"]
 PEExtremitiesEdemaOptions = Literal["Edema-None", "Edema Present"]
 PEExtremitiesCyanosisOptions = Literal["Cyanosis-none", "Cyanosis-Present"]
-PEExtremitiesClubbingOptions = Literal["Digital Clubbing-None", "Digital clubbing-present"]
-PEExtremitiesDiscolorationOptions = Literal["Discoloration-none", "Discoloration-Present"]
+PEExtremitiesClubbingOptions = Literal[
+    "Digital Clubbing-None", "Digital clubbing-present"
+]
+PEExtremitiesDiscolorationOptions = Literal[
+    "Discoloration-none", "Discoloration-Present"
+]
 PESkinStatusOptions = Literal["System", "Abnormal"]
 PENeuroAlertnessOptions = Literal["Alert and Oriented", "Altered orientation/alertness"]
 PENeuroSpeechOptions = Literal["Normal Speech", "Abnormal Speech"]
 PENeuroHemiplegiaOptions = Literal["No hemiplegia", "Hemiplegia"]
 PENeuroHemiparesisOptions = Literal["No hemiparesis", "Hemiparesis"]
-PENeuroCranialNervesOptions = Literal["Cranial nerves intact", "Paralysis cranial nerves"]
+PENeuroCranialNervesOptions = Literal[
+    "Cranial nerves intact", "Paralysis cranial nerves"
+]
 PENeuroSensoryOptions = Literal["No sensory deficits", "Sensory deficits"]
 PENeuroMotorOptions = Literal["No motor deficits", "Motor deficits"]
 PERectalOccultBloodOptions = Literal["Occult blood negative", "Occult blood positive"]
@@ -168,10 +212,13 @@ PEGUProstateOptions = Literal["Prostate Normal", "Prostate Abnormal"]
 MDMLevelOptions = Literal["High", "Moderate", "Low", "Straightforward"]
 
 ConsultationLengthOfVisitOptions = Literal[
-    "Visit length 30 minutes (99203)", "Visit length 44 minutes (99203)",
-    "Visit length 45 minutes (99204)", "Visit length 59 minutes (99204)",
-    "Visit length 60 minutes (99205)", "Visit length 74 minutes (99205)",
-    "Other"
+    "Visit length 30 minutes (99203)",
+    "Visit length 44 minutes (99203)",
+    "Visit length 45 minutes (99204)",
+    "Visit length 59 minutes (99204)",
+    "Visit length 60 minutes (99205)",
+    "Visit length 74 minutes (99205)",
+    "Other",
 ]
 
 
@@ -207,7 +254,9 @@ class ConsultationNoteTemplateModel(BaseModel):
     sh_living_with_children: Optional[bool] = None
     sh_living_nursing_home: Optional[bool] = None
     sh_living_other_enabled: Optional[bool] = None
-    sh_living_arrangements_other_details: FieldContent = Field(default_factory=FieldContent)
+    sh_living_arrangements_other_details: FieldContent = Field(
+        default_factory=FieldContent
+    )
     tobacco_status: Optional[ConsultationTobaccoStatusOptions] = None
     smoking_cessation: Optional[ConsultationSmokingCessationOptions] = None
     sh_tobacco_discontinued_year_enabled: Optional[bool] = None
@@ -234,7 +283,9 @@ class ConsultationNoteTemplateModel(BaseModel):
     secondary_occupation: FieldContent = Field(default_factory=FieldContent)
     sh_occupational_exposure_none: Optional[bool] = None
     sh_occupational_exposure_type_enabled: Optional[bool] = None
-    sh_occupational_exposure_type_details: FieldContent = Field(default_factory=FieldContent)
+    sh_occupational_exposure_type_details: FieldContent = Field(
+        default_factory=FieldContent
+    )
     sh_occupational_exposure_solvent: Optional[bool] = None
     sh_occupational_exposure_asbestos: Optional[bool] = None
     sh_occupational_exposure_agent_orange: Optional[bool] = None
@@ -354,14 +405,22 @@ class ConsultationNoteTemplateModel(BaseModel):
 
     ros_endo_system_negative: Optional[bool] = None  # FD_chkHLI
     ros_endo_no_polydipsia: Optional[bool] = None  # FD_chkROSEndo_NP (Corrected)
-    ros_endo_polydipsia_present: Optional[bool] = None  # FD_chkROSEndo_Polydipsia (Corrected)
+    ros_endo_polydipsia_present: Optional[bool] = (
+        None  # FD_chkROSEndo_Polydipsia (Corrected)
+    )
     ros_endo_no_polyphagia: Optional[bool] = None  # FD_chkROSEndo_NoP (Corrected)
-    ros_endo_polyphagia_present: Optional[bool] = None  # FD_chkROSEndo_Polyphagia (Corrected)
+    ros_endo_polyphagia_present: Optional[bool] = (
+        None  # FD_chkROSEndo_Polyphagia (Corrected)
+    )
     ros_endo_no_polyuria: Optional[bool] = None  # FD_chkROSEndo_NoPolyuria (Corrected)
-    ros_endo_polyuria_present: Optional[bool] = None  # FD_chkROSEndo_Polyuria (Corrected)
+    ros_endo_polyuria_present: Optional[bool] = (
+        None  # FD_chkROSEndo_Polyuria (Corrected)
+    )
 
     # --- PAIN/DEPRESSION Section ---
-    pain_scale_score: Optional[PainScaleOptions] = None  # Value ignored by standard mapping
+    pain_scale_score: Optional[PainScaleOptions] = (
+        None  # Value ignored by standard mapping
+    )
     pain_tx_reassess: Optional[bool] = None
     pain_tx_continue: Optional[bool] = None
     pain_tx_narcotic_adjusted: Optional[bool] = None
@@ -374,7 +433,9 @@ class ConsultationNoteTemplateModel(BaseModel):
     pain_tx_refused: Optional[bool] = None
     pain_tx_other_provider: Optional[bool] = None
     depression_screening_phq9: Optional[str] = None  # Value ignored by standard mapping
-    physician_note_on_depression_score: FieldContent = Field(default_factory=FieldContent)
+    physician_note_on_depression_score: FieldContent = Field(
+        default_factory=FieldContent
+    )
     depression_tx_no_action: Optional[bool] = None
     depression_tx_psychotherapy: Optional[bool] = None
     depression_tx_meds_prescribed: Optional[bool] = None
@@ -391,7 +452,9 @@ class ConsultationNoteTemplateModel(BaseModel):
     pe_general_system_negative: Optional[bool] = None
     pe_general_nutrition: Optional[PEGeneralNutritionOptions] = None
     pe_general_distress: Optional[PEGeneralDistressOptions] = None
-    ecog_performance_score: Optional[ECOGScaleOptions] = None  # Value ignored by standard mapping
+    ecog_performance_score: Optional[ECOGScaleOptions] = (
+        None  # Value ignored by standard mapping
+    )
     pe_general_age_appearance: Optional[PEGeneralAgeAppearanceOptions] = None
     pe_head_system_negative: Optional[bool] = None
     pe_head_trauma: Optional[PEHeadTraumaOptions] = None
@@ -426,7 +489,9 @@ class ConsultationNoteTemplateModel(BaseModel):
     pe_resp_auscultation: Optional[PERespAuscultationOptions] = None
     pe_resp_percussion_palpation: Optional[PERespPercussionPalpationOptions] = None
     pe_respiratory_also_noted_enabled: Optional[bool] = None
-    pe_respiratory_also_noted_details: FieldContent = Field(default_factory=FieldContent)
+    pe_respiratory_also_noted_details: FieldContent = Field(
+        default_factory=FieldContent
+    )
     pe_gi_system_negative: Optional[bool] = None
     pe_abdomen_scars_enabled: Optional[bool] = None
     pe_abdomen_scars_details: FieldContent = Field(default_factory=FieldContent)
@@ -506,7 +571,9 @@ class ConsultationNoteTemplateModel(BaseModel):
 
     # --- Time Spent ---
     length_of_patient_visit: Optional[ConsultationLengthOfVisitOptions] = None
-    length_of_patient_visit_other_minutes: FieldContent = Field(default_factory=FieldContent)
+    length_of_patient_visit_other_minutes: FieldContent = Field(
+        default_factory=FieldContent
+    )
 
     # --- MDM ---
     mdm_level: Optional[MDMLevelOptions] = None
@@ -546,4 +613,4 @@ class ConsultationNoteTemplateModel(BaseModel):
     pe_chest_also_noted_enabled: Optional[bool] = None
 
     class Config:
-        extra = 'ignore'  # Ignore fields from input not defined in the model
+        extra = "ignore"  # Ignore fields from input not defined in the model

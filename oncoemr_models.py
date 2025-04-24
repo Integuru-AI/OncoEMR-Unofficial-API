@@ -7,13 +7,17 @@ class FieldContent(BaseModel):
     append: bool = True
 
 
-MaritalStatusOptions = Literal["Single", "Married", "Divorced", "Widowed", "Has Significant Other"]
+MaritalStatusOptions = Literal[
+    "Single", "Married", "Divorced", "Widowed", "Has Significant Other"
+]
 # Define tobacco use status options
 TobaccoStatusOptions = Literal["Non Smoker", "Never Smoked", "Smoker", "Ex-Smoker"]
 
 # Define how often options
 TobaccoFrequencyOptions = Literal[
-    "Tobacco smoking consumption unknown", "Smokes tobacco daily", "Occasional tobacco smoker"
+    "Tobacco smoking consumption unknown",
+    "Smokes tobacco daily",
+    "Occasional tobacco smoker",
 ]
 
 # Define intensity options
@@ -28,16 +32,23 @@ TobaccoTypeOptions = Literal[
 ]
 
 # Define smokeless tobacco options
-SmokelessTobaccoOptions = Literal["Smokeless tobacco NON user", "User of smokeless tobacco"]
+SmokelessTobaccoOptions = Literal[
+    "Smokeless tobacco NON user", "User of smokeless tobacco"
+]
 
 # Define exposure options
 TobaccoExposureOptions = Literal[
-    "Exposed to tobacco smoke at home", "Exposed to tobacco smoke at work", "No known exposure to tobacco smoke"
+    "Exposed to tobacco smoke at home",
+    "Exposed to tobacco smoke at work",
+    "No known exposure to tobacco smoke",
 ]
 
 # Define smoking cessation intervention options
 SmokingCessationOptions = Literal[
-    "Not Discussed", "Advised to Quit", "Discussed Cessation Methods", "Discussed Cessation Medications"
+    "Not Discussed",
+    "Advised to Quit",
+    "Discussed Cessation Methods",
+    "Discussed Cessation Medications",
 ]
 
 # Define family cancer history options
@@ -86,7 +97,9 @@ ROSRespSputumOptions = Literal["No Sputum Production", "Sputum Production"]
 ROSRespHemoptysisOptions = Literal["No Hemoptysis", "Hemoptysis"]
 ROSRespBreathOptions = Literal["No Shortness of Breath", "Shortness of Breath"]
 ROSRespOrthopneaOptions = Literal["No Orthopnea", "Orthopnea"]
-ROSRespNPDOptions = Literal["No Nocturnal Paroxysmal Dyspnea", "Nocturnal Paroxysmal Dyspnea"]
+ROSRespNPDOptions = Literal[
+    "No Nocturnal Paroxysmal Dyspnea", "Nocturnal Paroxysmal Dyspnea"
+]
 
 # Gastrointestinal system literals
 ROSGastroNauseaOptions = Literal["No Nausea", "Nausea"]
@@ -96,7 +109,9 @@ ROSGastroConstipationOptions = Literal["No Constipation", "Constipation"]
 ROSGastroDiarrheaOptions = Literal["No Diarrhea", "Diarrhea"]
 ROSGastroAbdominalPainOptions = Literal["No Abdominal Pain", "Abdominal Pain"]
 ROSGastroRectalBleedingOptions = Literal["No Rectal Bleeding", "Rectal Bleeding"]
-ROSGastroBowelIncontinenceOptions = Literal["No Bowel Incontinence", "Bowel Incontinence"]
+ROSGastroBowelIncontinenceOptions = Literal[
+    "No Bowel Incontinence", "Bowel Incontinence"
+]
 
 # Genitourinary system literals
 ROSGenitoBurningOptions = Literal["No Burning on Urination", "Burning on Urination"]
@@ -104,7 +119,9 @@ ROSGenitoPainOptions = Literal["No Pain with Urination", "Pain with Urination"]
 ROSGenitoUrgencyOptions = Literal["No Urgency", "Urgency"]
 ROSGenitoBloodOptions = Literal["No Blood in Urine", "Blood in Urine"]
 ROSGenitoFrequencyOptions = Literal["No Frequent Urination", "Frequent Urination"]
-ROSGenitoIncontinenceOptions = Literal["No Urinary Incontinence", "Urinary Incontinence"]
+ROSGenitoIncontinenceOptions = Literal[
+    "No Urinary Incontinence", "Urinary Incontinence"
+]
 
 # Skeletal/Musculoskeletal system literals
 ROSSkelMusclePainOptions = Literal["No Muscle Pain", "Muscle Pain"]
@@ -113,7 +130,9 @@ ROSSkelJointPainOptions = Literal["No Joint Pain", "Joint Pain"]
 ROSSkelJointSwellingOptions = Literal["No joint swelling", "Joint swelling"]
 ROSSkelBackPainOptions = Literal["No Back Pain", "Back Pain"]
 
-ROSSkinRashOptions = Literal["Not Asked", "No skin rash(es)", "Skin Rash", "Other skin complaints"]
+ROSSkinRashOptions = Literal[
+    "Not Asked", "No skin rash(es)", "Skin Rash", "Other skin complaints"
+]
 
 # Neurological system literals
 ROSNeuroHeadacheOptions = Literal["No Headaches", "Headaches"]
@@ -143,11 +162,17 @@ ROSHemaGroinOptions = Literal["No Lumps in Groin", "Lumps in Groin"]
 ChaperoneOptions = Literal["Accepted", "Declined"]
 
 # Physical Exam - General literals
-PEGeneralNutritionOptions = Literal["Well developed, well nourished", "Malnourished/cachectic"]
-PEGeneralDistressOptions = Literal["No acute Distress", "Acutely ill-looking", "Chronicly Ill looking"]
+PEGeneralNutritionOptions = Literal[
+    "Well developed, well nourished", "Malnourished/cachectic"
+]
+PEGeneralDistressOptions = Literal[
+    "No acute Distress", "Acutely ill-looking", "Chronicly Ill looking"
+]
 PEGeneralAgeOptions = Literal["Appears Stated age", "Elderly appearance"]
 
-PEHeadTraumaOptions = Literal["Atraumatic and normocephalic", "Traumatic with a wound/scar on the scalp/face"]
+PEHeadTraumaOptions = Literal[
+    "Atraumatic and normocephalic", "Traumatic with a wound/scar on the scalp/face"
+]
 
 # Physical Exam - Eyes literals
 PEEyesPupilsOptions = Literal["PERRLA", "Unequal"]
@@ -179,8 +204,12 @@ PEChestKyphosisOptions = Literal["No kyphosis", "Kyphosis"]
 PEChestScoliosisOptions = Literal["No scoliosis", "Scoliosis noted"]
 
 # Physical Exam - Respiratory literals
-PERespLungSoundsOptions = Literal["Clear, No rales/Rhonchi", "Rales/Rhonchi present", "Pleural Effusion"]
-PERespPercussionOptions = Literal["Percussion and palpation-Normal", "Percussion and palpation abnormal"]
+PERespLungSoundsOptions = Literal[
+    "Clear, No rales/Rhonchi", "Rales/Rhonchi present", "Pleural Effusion"
+]
+PERespPercussionOptions = Literal[
+    "Percussion and palpation-Normal", "Percussion and palpation abnormal"
+]
 
 # Physical Exam - Abdomen literals
 PEAbdomenConsistencyOptions = Literal["Abdomen soft", "Abdomen firmness"]
@@ -194,28 +223,43 @@ PEAbdomenHerniaOptions = Literal["No hernia", "Hernia"]
 PEAbdomenBowelSoundsOptions = Literal["Bowel sounds -Normal", "Bowel sounds -abnormal"]
 
 PEMusculoskeletalStatusOptions = Literal[
-    "Deferred"]  # Might need more options if other radio buttons use name="FD_rdoNEG"
-PEMusculoskeletalGaitOptions = Literal["Normal gait and station", "Abnormal gait and station"]
-PEMusculoskeletalROMOptions = Literal["Range of motion normal", "Decreased range of motion"]
-PEMusculoskeletalToneOptions = Literal["Strength/Tone normal", "Strength/Tone decreased"]
+    "Deferred"
+]  # Might need more options if other radio buttons use name="FD_rdoNEG"
+PEMusculoskeletalGaitOptions = Literal[
+    "Normal gait and station", "Abnormal gait and station"
+]
+PEMusculoskeletalROMOptions = Literal[
+    "Range of motion normal", "Decreased range of motion"
+]
+PEMusculoskeletalToneOptions = Literal[
+    "Strength/Tone normal", "Strength/Tone decreased"
+]
 PEMusculoskeletalStatureOptions = Literal["Stature Normal", "Loss of Stature"]
 
 # --- NEW Literals for Physical Exam - Extremities ---
 PEExtremitiesStatusOptions = Literal["Not examined"]
 PEExtremitiesEdemaOptions = Literal["Edema-None", "Edema Present"]
 PEExtremitiesCyanosisOptions = Literal["Cyanosis-none", "Cyanosis-Present"]
-PEExtremitiesClubbingOptions = Literal["Digital Clubbing-None", "Digital clubbing-present"]
-PEExtremitiesDiscolorationOptions = Literal["Discoloration-none", "Discoloration-Present"]
+PEExtremitiesClubbingOptions = Literal[
+    "Digital Clubbing-None", "Digital clubbing-present"
+]
+PEExtremitiesDiscolorationOptions = Literal[
+    "Discoloration-none", "Discoloration-Present"
+]
 
 # --- NEW Literals for Physical Exam - Skin ---
 PESkinStatusOptions = Literal["System", "Abnormal"]
 
 # --- NEW Literals for Physical Exam - Neurologic ---
-PENeurologicAlertnessOptions = Literal["Alert and Oriented", "Altered orientation/alertness"]
+PENeurologicAlertnessOptions = Literal[
+    "Alert and Oriented", "Altered orientation/alertness"
+]
 PENeurologicSpeechOptions = Literal["Normal Speech", "Abnormal Speech"]
 PENeurologicHemiplegiaOptions = Literal["No hemiplegia", "Hemiplegia"]
 PENeurologicHemiparesisOptions = Literal["No hemiparesis", "Hemiparesis"]
-PENeurologicCranialNervesOptions = Literal["Cranial nerves intact", "Paralysis cranial nerves"]
+PENeurologicCranialNervesOptions = Literal[
+    "Cranial nerves intact", "Paralysis cranial nerves"
+]
 PENeurologicSensoryOptions = Literal["No sensory deficits", "Sensory deficits"]
 PENeurologicMotorOptions = Literal["No motor deficits", "Motor deficits"]
 
@@ -227,7 +271,9 @@ PERectalMassesOptions = Literal["No masses", "Mass(es)"]
 PEGUProstateOptions = Literal["Prostate Normal", "Prostate Abnormal"]
 
 # --- NEW Literals for Assessment/Plan ---
-AssessmentStatusOptions = Literal["NED", "Stable", "Partial Response", "Complete Response", "Progression of Disease"]
+AssessmentStatusOptions = Literal[
+    "NED", "Stable", "Partial Response", "Complete Response", "Progression of Disease"
+]
 ACPLivingWillOptions = Literal["Yes", "No", "Unknown"]
 ACPPOAOptions = Literal["Yes", "No", "Unknown"]
 ACPPOLSTOptions = Literal["Yes", "No", "Unknown"]
@@ -236,18 +282,16 @@ ACPGoalOfCareOptions = Literal["Palliative", "Curative", "Hospice"]
 
 # --- NEW Literals for Time Spent (Simplified Values) ---
 LengthOfVisitOptions = Literal[
-    "30 min (99214)",
-    "39 min (99214)",
-    "40 min (99215)",
-    "54 min (99215)",
-    "Other"
+    "30 min (99214)", "39 min (99214)", "40 min (99215)", "54 min (99215)", "Other"
 ]
 
 # --- NEW Literals for Social History - Drug Use ---
 SHDrugUseStatusOptions = Literal["Negative", "Positive"]
 
 # --- NEW Literals for Social History - Alcohol Use ---
-SHAlcoholUseStatusOptions = Literal["Not Asked", "Never", "Currently uses", "Former use"]
+SHAlcoholUseStatusOptions = Literal[
+    "Not Asked", "Never", "Currently uses", "Former use"
+]
 
 
 class FollowupNoteTemplateModel(BaseModel):
@@ -260,7 +304,9 @@ class FollowupNoteTemplateModel(BaseModel):
     primary_occupation: FieldContent = Field(default_factory=FieldContent)
     secondary_occupation: FieldContent = Field(default_factory=FieldContent)
     review_of_systems: FieldContent = Field(default_factory=FieldContent)
-    physician_note_on_depression_score: FieldContent = Field(default_factory=FieldContent)
+    physician_note_on_depression_score: FieldContent = Field(
+        default_factory=FieldContent
+    )
     physical_exam: FieldContent = Field(default_factory=FieldContent)
     other_lab_studies: FieldContent = Field(default_factory=FieldContent)
     radiology_results: FieldContent = Field(default_factory=FieldContent)
@@ -281,9 +327,13 @@ class FollowupNoteTemplateModel(BaseModel):
     smoking_cessation: Optional[SmokingCessationOptions] = None
 
     # --- NEW Social History - Tobacco Use History Fields ---
-    sh_tobacco_discontinued_year_enabled: Optional[bool] = None  # Checkbox: FD_chkSHTobUse_20
+    sh_tobacco_discontinued_year_enabled: Optional[bool] = (
+        None  # Checkbox: FD_chkSHTobUse_20
+    )
     sh_tobacco_pack_years_enabled: Optional[bool] = None  # Checkbox: FD_chkSHTobUse_PH
-    sh_tobacco_type_details_enabled: Optional[bool] = None  # Checkbox: FD_chkSHTobUse_KIND
+    sh_tobacco_type_details_enabled: Optional[bool] = (
+        None  # Checkbox: FD_chkSHTobUse_KIND
+    )
 
     # Family History fields
     mother_cancer_history: Optional[FamilyCancerHistoryOptions] = None
@@ -507,20 +557,40 @@ class FollowupNoteTemplateModel(BaseModel):
     pe_abdomen_ostomy: Optional[bool] = None
 
     # --- NEW Physical Exam - Musculoskeletal Fields ---
-    pe_musculoskeletal_system_negative: Optional[bool] = None  # Checkbox: FD_chkPESkel_Neg
+    pe_musculoskeletal_system_negative: Optional[bool] = (
+        None  # Checkbox: FD_chkPESkel_Neg
+    )
     pe_musculoskeletal_status: Optional[PEMusculoskeletalStatusOptions] = None
-    pe_musculoskeletal_gait: Optional[PEMusculoskeletalGaitOptions] = None  # Radio group: FD_rdoMUSGAIT
-    pe_musculoskeletal_rom: Optional[PEMusculoskeletalROMOptions] = None  # Radio group: FD_rdoROM
-    pe_musculoskeletal_tone: Optional[PEMusculoskeletalToneOptions] = None  # Radio group: FD_rdoTONE
+    pe_musculoskeletal_gait: Optional[PEMusculoskeletalGaitOptions] = (
+        None  # Radio group: FD_rdoMUSGAIT
+    )
+    pe_musculoskeletal_rom: Optional[PEMusculoskeletalROMOptions] = (
+        None  # Radio group: FD_rdoROM
+    )
+    pe_musculoskeletal_tone: Optional[PEMusculoskeletalToneOptions] = (
+        None  # Radio group: FD_rdoTONE
+    )
     pe_musculoskeletal_stature: Optional[PEMusculoskeletalStatureOptions] = None
-    pe_musculoskeletal_also_noted_enabled: Optional[bool] = None  # Checkbox: FD_chkAlsonoted_1
+    pe_musculoskeletal_also_noted_enabled: Optional[bool] = (
+        None  # Checkbox: FD_chkAlsonoted_1
+    )
 
     # --- NEW Physical Exam - Extremities Fields ---
-    pe_extremities_system_negative: Optional[bool] = None  # Checkbox: FD_chkPEExtremities
-    pe_extremities_status: Optional[PEExtremitiesStatusOptions] = None  # Radio: FD_rdoNotexamined
-    pe_extremities_edema: Optional[PEExtremitiesEdemaOptions] = None  # Radio group: FD_rdoEEDEMA
-    pe_extremities_cyanosis: Optional[PEExtremitiesCyanosisOptions] = None  # Radio group: FD_rdoBLUE
-    pe_extremities_clubbing: Optional[PEExtremitiesClubbingOptions] = None  # Radio group: FD_rdoDCLUB
+    pe_extremities_system_negative: Optional[bool] = (
+        None  # Checkbox: FD_chkPEExtremities
+    )
+    pe_extremities_status: Optional[PEExtremitiesStatusOptions] = (
+        None  # Radio: FD_rdoNotexamined
+    )
+    pe_extremities_edema: Optional[PEExtremitiesEdemaOptions] = (
+        None  # Radio group: FD_rdoEEDEMA
+    )
+    pe_extremities_cyanosis: Optional[PEExtremitiesCyanosisOptions] = (
+        None  # Radio group: FD_rdoBLUE
+    )
+    pe_extremities_clubbing: Optional[PEExtremitiesClubbingOptions] = (
+        None  # Radio group: FD_rdoDCLUB
+    )
     pe_extremities_discoloration: Optional[PEExtremitiesDiscolorationOptions] = None
 
     # --- NEW Physical Exam - Skin Field ---
@@ -528,18 +598,36 @@ class FollowupNoteTemplateModel(BaseModel):
 
     # --- NEW Physical Exam - Neurologic Fields ---
     pe_neurologic_system_negative: Optional[bool] = None  # Checkbox: FD_chkPENeuro_Neg
-    pe_neurologic_alertness: Optional[PENeurologicAlertnessOptions] = None  # Radio group: FD_rdoAOO
-    pe_neurologic_speech: Optional[PENeurologicSpeechOptions] = None  # Radio group: FD_rdoSPEECH
-    pe_neurologic_hemiplegia: Optional[PENeurologicHemiplegiaOptions] = None  # Radio group: FD_rdoHEMI
-    pe_neurologic_hemiparesis: Optional[PENeurologicHemiparesisOptions] = None  # Radio group: FD_rdoPARESIS
-    pe_neurologic_cranial_nerves: Optional[PENeurologicCranialNervesOptions] = None  # Radio group: FD_rdoCRANN
-    pe_neurologic_sensory: Optional[PENeurologicSensoryOptions] = None  # Radio group: FD_rdoSENSORY
-    pe_neurologic_motor: Optional[PENeurologicMotorOptions] = None  # Radio group: FD_rdoMDEFECITS
+    pe_neurologic_alertness: Optional[PENeurologicAlertnessOptions] = (
+        None  # Radio group: FD_rdoAOO
+    )
+    pe_neurologic_speech: Optional[PENeurologicSpeechOptions] = (
+        None  # Radio group: FD_rdoSPEECH
+    )
+    pe_neurologic_hemiplegia: Optional[PENeurologicHemiplegiaOptions] = (
+        None  # Radio group: FD_rdoHEMI
+    )
+    pe_neurologic_hemiparesis: Optional[PENeurologicHemiparesisOptions] = (
+        None  # Radio group: FD_rdoPARESIS
+    )
+    pe_neurologic_cranial_nerves: Optional[PENeurologicCranialNervesOptions] = (
+        None  # Radio group: FD_rdoCRANN
+    )
+    pe_neurologic_sensory: Optional[PENeurologicSensoryOptions] = (
+        None  # Radio group: FD_rdoSENSORY
+    )
+    pe_neurologic_motor: Optional[PENeurologicMotorOptions] = (
+        None  # Radio group: FD_rdoMDEFECITS
+    )
 
     # --- NEW Physical Exam - Rectal Fields ---
-    pe_rectal_system_negative: Optional[bool] = None  # Checkbox: FD_chkPERectal_negative
+    pe_rectal_system_negative: Optional[bool] = (
+        None  # Checkbox: FD_chkPERectal_negative
+    )
     pe_rectal_deferred: Optional[bool] = None  # Checkbox: FD_chkPERectal_Deferred
-    pe_rectal_occult_blood: Optional[PERectalOccultBloodOptions] = None  # Radio group: FD_rdoRECTAL
+    pe_rectal_occult_blood: Optional[PERectalOccultBloodOptions] = (
+        None  # Radio group: FD_rdoRECTAL
+    )
     pe_rectal_masses: Optional[PERectalMassesOptions] = None  # Radio group: FD_rdoRMASS
 
     # --- NEW Physical Exam - GU Fields ---
@@ -567,21 +655,41 @@ class FollowupNoteTemplateModel(BaseModel):
 
     # --- NEW Social History - Occupational Exposure Fields ---
     sh_occupational_exposure_none: Optional[bool] = None  # Checkbox: FD_chkSHOP_Neg
-    sh_occupational_exposure_type_enabled: Optional[bool] = None  # Checkbox: FD_chkSHOP_TYPE
-    sh_occupational_exposure_solvent: Optional[bool] = None  # Checkbox: FD_chkSolventexposure
-    sh_occupational_exposure_asbestos: Optional[bool] = None  # Checkbox: FD_chkAsbestosExp
-    sh_occupational_exposure_agent_orange: Optional[bool] = None  # Checkbox: FD_chkAgentOrangeexp
+    sh_occupational_exposure_type_enabled: Optional[bool] = (
+        None  # Checkbox: FD_chkSHOP_TYPE
+    )
+    sh_occupational_exposure_solvent: Optional[bool] = (
+        None  # Checkbox: FD_chkSolventexposure
+    )
+    sh_occupational_exposure_asbestos: Optional[bool] = (
+        None  # Checkbox: FD_chkAsbestosExp
+    )
+    sh_occupational_exposure_agent_orange: Optional[bool] = (
+        None  # Checkbox: FD_chkAgentOrangeexp
+    )
 
     # --- NEW Social History - Drug Use Fields ---
-    sh_drug_use_status: Optional[SHDrugUseStatusOptions] = None  # Radio group: FD_rdoDRUGS
+    sh_drug_use_status: Optional[SHDrugUseStatusOptions] = (
+        None  # Radio group: FD_rdoDRUGS
+    )
     sh_drug_use_type_enabled: Optional[bool] = None
 
     # --- NEW Social History - Alcohol Use Fields ---
-    sh_alcohol_use_status: Optional[SHAlcoholUseStatusOptions] = None  # Radio group: FD_rdoUSES
-    sh_alcohol_drinks_per_day_enabled: Optional[bool] = None  # Checkbox: FD_chkSHAlchUse_4
-    sh_alcohol_drinks_per_week_enabled: Optional[bool] = None  # Checkbox: FD_chkSHAlchUse_6
-    sh_alcohol_drinks_per_month_enabled: Optional[bool] = None  # Checkbox: FD_chkSHAlchUse_8
-    sh_alcohol_drinks_per_year_enabled: Optional[bool] = None  # Checkbox: FD_chkSHAlchUse_10
+    sh_alcohol_use_status: Optional[SHAlcoholUseStatusOptions] = (
+        None  # Radio group: FD_rdoUSES
+    )
+    sh_alcohol_drinks_per_day_enabled: Optional[bool] = (
+        None  # Checkbox: FD_chkSHAlchUse_4
+    )
+    sh_alcohol_drinks_per_week_enabled: Optional[bool] = (
+        None  # Checkbox: FD_chkSHAlchUse_6
+    )
+    sh_alcohol_drinks_per_month_enabled: Optional[bool] = (
+        None  # Checkbox: FD_chkSHAlchUse_8
+    )
+    sh_alcohol_drinks_per_year_enabled: Optional[bool] = (
+        None  # Checkbox: FD_chkSHAlchUse_10
+    )
     sh_alcohol_stopped_year_enabled: Optional[bool] = None  # Checkbox: FD_chkSHAlchStop
 
     # --- NEW Social History - Living Arrangements Fields ---
