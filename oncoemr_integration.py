@@ -202,9 +202,9 @@ class OncoEmrIntegration(Integration):
             "bNewResource": True,
             "sMDUID": f"{doctor_id}",
             "bShowPatLocCol": "True",
-            "bMDVisitsOnly": "True",
+            "bMDVisitsOnly": "False",
             "bHideUnscheduled": "True",
-            "olHideFilters": ["chkHideUnscheduled", "chkVisitsOnly"],
+            "olHideFilters": ["chkHideUnscheduled"],
             "bShowVisitsOnly": True,
         }
 
@@ -772,7 +772,8 @@ PRINT
     #
     #     return text_fields
 
-    async def generic_notes_submit(self, note_name: str, patient_id: str, fields: dict):
+    async def generic_notes_submit(self, note_name: str, patient_id: str, fields: dict, created_on: str = None):
+        # created_on: MM/DD/YYYY
         note_inputs = await self.generic_notes_fetch(
             note_name=note_name,
             patient_id=patient_id,
@@ -809,16 +810,38 @@ PRINT
         note_form_id_elem = note_soup.select_one("input#txtFormID")
         note_form_id = note_form_id_elem.get("value")
 
+        date_pattern = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$")
+        if created_on:
+            # First check basic format with regex
+            if not date_pattern.match(created_on):
+                raise IntegrationAPIError(
+                    integration_name=self.integration_name,
+                    status_code=400,
+                    error_code="client_error",
+                    message=f"Invalid date format for `created_on`: {created_on}. Expected MM/DD/YYYY.",
+                )
+
+            # Then check if it's a valid date
+            try:
+                datetime.strptime(created_on, "%m/%d/%Y")
+            except ValueError:
+                raise IntegrationAPIError(
+                    integration_name=self.integration_name,
+                    status_code=400,
+                    error_code="client_error",
+                    message=f"Invalid date for `created_on`: {created_on}. Date doesn't exist.",
+                )
+
         param_string = f"""
 %02
 %02
 {note_name.replace(' ', '')}%02
 {note_name}%02
-{self._get_current_date()}%02
+{created_on if created_on else self._get_current_date()}%02
 {note_form_id}%02
 background%02
 {note_name}%02
-{self._get_current_date()}%02
+{"" if created_on else self._get_current_date()}%02
 %02
 {self.group_id}%02
 {patient_id}%02
@@ -840,6 +863,8 @@ PRINT
 
         headers = self.headers.copy()
         headers["Content-Type"] = "application/json"
+        headers["Referer"] = self.url + (f"//WebForms/PD_DocOncoNoteDB.aspx?FID={selected_note["value"]}&__OS="
+                                         f"{self.group_id}~{self.user_id}~{patient_id}&_SK=&__full=true")
 
         path = self.url + "/VisitNotes/AutoSaveVisitNote"
         response = await self._make_request(
@@ -1971,75 +1996,75 @@ PRINT
         clean = re.compile("<.*?>")
         return re.sub(clean, "", text).strip()  # Also strip leading/trailing whitespace
 
-    @staticmethod
-    def _extract_form_data_fd_only(html_string):
-        """
-        Extracts form data ONLY for elements with IDs starting with 'FD_',
-        creating key-value pairs and formatting the result.
-        Decodes HTML entities and strips tags from textareas.
-        """
-        form_data_dict = (
-            {}
-        )  # Use a dictionary to automatically handle potential duplicates
-        # --- Textareas ---
-        # Regex captures ID and the raw inner content
-        textareas = re.findall(
-            r'<textarea.*?id="([^"]*)".*?>(.*?)</textarea>', html_string, re.DOTALL
-        )
-        for id_val, raw_value in textareas:
-            if id_val.startswith("FD_"):
-                # Decode HTML entities (like <) first
-                decoded_value = html.unescape(raw_value)
-                # Remove HTML tags, convert <br> to newline (or remove if not desired)
-                cleaned_value = OncoEmrIntegration._remove_html_tags(decoded_value)
-                form_data_dict[id_val] = cleaned_value
-        # --- Text Inputs (including hidden-like ones with value) ---
-        # Capture type="text" inputs with an ID and potentially a value
-        text_inputs = re.findall(
-            r'<input.*?type="text".*?id="([^"]*)".*?(?:value="([^"]*)")?.*?>',
-            html_string,
-            re.IGNORECASE | re.DOTALL,
-        )
-        for id_val, value in text_inputs:
-            # Filter by ID prefix
-            if id_val.startswith("FD_"):
-                # Use the captured value, or empty string if value attribute is missing/empty
-                form_data_dict[id_val] = value if value is not None else ""
-        # --- Checkboxes and Radios ---
-        all_inputs = re.finditer(r"<input.*?>", html_string, re.IGNORECASE | re.DOTALL)
-        all_relevant_ids = set()
-        checked_ids = set()
-        for match in all_inputs:
-            input_tag = match.group(0)
-            id_match = re.search(
-                r'id="(FD_[^"]*)"', input_tag, re.IGNORECASE
-            )  # Filter ID here
-            if id_match:
-                input_id = id_match.group(1)
-                type_match = re.search(
-                    r'type="(checkbox|radio)"', input_tag, re.IGNORECASE
-                )
-                if type_match:  # It's a checkbox or radio with an FD_ id
-                    all_relevant_ids.add(input_id)
-                    # Check if 'checked' attribute exists
-                    if re.search(
-                        r"\schecked(?:=.*?)?(\s|>|/>)", input_tag, re.IGNORECASE
-                    ):
-                        checked_ids.add(input_id)
-        # Add checkbox/radio states to the dictionary
-        for id_val in all_relevant_ids:
-            value = "true" if id_val in checked_ids else "false"
-            # Ensure text inputs don't accidentally overwrite checkbox/radio state if IDs clash (unlikely but safe)
-            if id_val not in form_data_dict or form_data_dict[id_val] in [
-                "true",
-                "false",
-            ]:
-                form_data_dict[id_val] = value
-        # --- Format the output ---
-        # Sort keys for consistent output order (optional, but good practice)
-        output_parts = [f"{k}%01{v}" for k, v in sorted(form_data_dict.items())]
-        # return form_data_dict, "%02".join(output_parts)
-        return form_data_dict
+    # @staticmethod
+    # def _extract_form_data_fd_only(html_string):
+    #     """
+    #     Extracts form data ONLY for elements with IDs starting with 'FD_',
+    #     creating key-value pairs and formatting the result.
+    #     Decodes HTML entities and strips tags from textareas.
+    #     """
+    #     form_data_dict = (
+    #         {}
+    #     )  # Use a dictionary to automatically handle potential duplicates
+    #     # --- Textareas ---
+    #     # Regex captures ID and the raw inner content
+    #     textareas = re.findall(
+    #         r'<textarea.*?id="([^"]*)".*?>(.*?)</textarea>', html_string, re.DOTALL
+    #     )
+    #     for id_val, raw_value in textareas:
+    #         if id_val.startswith("FD_"):
+    #             # Decode HTML entities (like <) first
+    #             decoded_value = html.unescape(raw_value)
+    #             # Remove HTML tags, convert <br> to newline (or remove if not desired)
+    #             cleaned_value = OncoEmrIntegration._remove_html_tags(decoded_value)
+    #             form_data_dict[id_val] = cleaned_value
+    #     # --- Text Inputs (including hidden-like ones with value) ---
+    #     # Capture type="text" inputs with an ID and potentially a value
+    #     text_inputs = re.findall(
+    #         r'<input.*?type="text".*?id="([^"]*)".*?(?:value="([^"]*)")?.*?>',
+    #         html_string,
+    #         re.IGNORECASE | re.DOTALL,
+    #     )
+    #     for id_val, value in text_inputs:
+    #         # Filter by ID prefix
+    #         if id_val.startswith("FD_"):
+    #             # Use the captured value, or empty string if value attribute is missing/empty
+    #             form_data_dict[id_val] = value if value is not None else ""
+    #     # --- Checkboxes and Radios ---
+    #     all_inputs = re.finditer(r"<input.*?>", html_string, re.IGNORECASE | re.DOTALL)
+    #     all_relevant_ids = set()
+    #     checked_ids = set()
+    #     for match in all_inputs:
+    #         input_tag = match.group(0)
+    #         id_match = re.search(
+    #             r'id="(FD_[^"]*)"', input_tag, re.IGNORECASE
+    #         )  # Filter ID here
+    #         if id_match:
+    #             input_id = id_match.group(1)
+    #             type_match = re.search(
+    #                 r'type="(checkbox|radio)"', input_tag, re.IGNORECASE
+    #             )
+    #             if type_match:  # It's a checkbox or radio with an FD_ id
+    #                 all_relevant_ids.add(input_id)
+    #                 # Check if 'checked' attribute exists
+    #                 if re.search(
+    #                     r"\schecked(?:=.*?)?(\s|>|/>)", input_tag, re.IGNORECASE
+    #                 ):
+    #                     checked_ids.add(input_id)
+    #     # Add checkbox/radio states to the dictionary
+    #     for id_val in all_relevant_ids:
+    #         value = "true" if id_val in checked_ids else "false"
+    #         # Ensure text inputs don't accidentally overwrite checkbox/radio state if IDs clash (unlikely but safe)
+    #         if id_val not in form_data_dict or form_data_dict[id_val] in [
+    #             "true",
+    #             "false",
+    #         ]:
+    #             form_data_dict[id_val] = value
+    #     # --- Format the output ---
+    #     # Sort keys for consistent output order (optional, but good practice)
+    #     output_parts = [f"{k}%01{v}" for k, v in sorted(form_data_dict.items())]
+    #     # return form_data_dict, "%02".join(output_parts)
+    #     return form_data_dict
 
     @staticmethod
     def _remove_html_tags(text):
