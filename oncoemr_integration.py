@@ -202,7 +202,7 @@ class OncoEmrIntegration(Integration):
             "bNewResource": True,
             "sMDUID": f"{doctor_id}",
             "bShowPatLocCol": "True",
-            "bMDVisitsOnly": "False",
+            "bMDVisitsOnly": "True",
             "bHideUnscheduled": "True",
             "olHideFilters": ["chkHideUnscheduled"],
             "bShowVisitsOnly": True,
