@@ -2027,97 +2027,46 @@ PRINT
         return result_dict
 
     @staticmethod
-    def remove_html_tags(text):
-        """Removes HTML tags from a string."""
-        # Handle <br> specifically if needed, otherwise remove all tags
-        text = text.replace("<br>", "\n").replace(
-            "<br>", "\n"
-        )  # Convert breaks to newlines
-        clean = re.compile("<.*?>")
-        return re.sub(clean, "", text).strip()  # Also strip leading/trailing whitespace
-
-    # @staticmethod
-    # def _extract_form_data_fd_only(html_string):
-    #     """
-    #     Extracts form data ONLY for elements with IDs starting with 'FD_',
-    #     creating key-value pairs and formatting the result.
-    #     Decodes HTML entities and strips tags from textareas.
-    #     """
-    #     form_data_dict = (
-    #         {}
-    #     )  # Use a dictionary to automatically handle potential duplicates
-    #     # --- Textareas ---
-    #     # Regex captures ID and the raw inner content
-    #     textareas = re.findall(
-    #         r'<textarea.*?id="([^"]*)".*?>(.*?)</textarea>', html_string, re.DOTALL
-    #     )
-    #     for id_val, raw_value in textareas:
-    #         if id_val.startswith("FD_"):
-    #             # Decode HTML entities (like <) first
-    #             decoded_value = html.unescape(raw_value)
-    #             # Remove HTML tags, convert <br> to newline (or remove if not desired)
-    #             cleaned_value = OncoEmrIntegration._remove_html_tags(decoded_value)
-    #             form_data_dict[id_val] = cleaned_value
-    #     # --- Text Inputs (including hidden-like ones with value) ---
-    #     # Capture type="text" inputs with an ID and potentially a value
-    #     text_inputs = re.findall(
-    #         r'<input.*?type="text".*?id="([^"]*)".*?(?:value="([^"]*)")?.*?>',
-    #         html_string,
-    #         re.IGNORECASE | re.DOTALL,
-    #     )
-    #     for id_val, value in text_inputs:
-    #         # Filter by ID prefix
-    #         if id_val.startswith("FD_"):
-    #             # Use the captured value, or empty string if value attribute is missing/empty
-    #             form_data_dict[id_val] = value if value is not None else ""
-    #     # --- Checkboxes and Radios ---
-    #     all_inputs = re.finditer(r"<input.*?>", html_string, re.IGNORECASE | re.DOTALL)
-    #     all_relevant_ids = set()
-    #     checked_ids = set()
-    #     for match in all_inputs:
-    #         input_tag = match.group(0)
-    #         id_match = re.search(
-    #             r'id="(FD_[^"]*)"', input_tag, re.IGNORECASE
-    #         )  # Filter ID here
-    #         if id_match:
-    #             input_id = id_match.group(1)
-    #             type_match = re.search(
-    #                 r'type="(checkbox|radio)"', input_tag, re.IGNORECASE
-    #             )
-    #             if type_match:  # It's a checkbox or radio with an FD_ id
-    #                 all_relevant_ids.add(input_id)
-    #                 # Check if 'checked' attribute exists
-    #                 if re.search(
-    #                     r"\schecked(?:=.*?)?(\s|>|/>)", input_tag, re.IGNORECASE
-    #                 ):
-    #                     checked_ids.add(input_id)
-    #     # Add checkbox/radio states to the dictionary
-    #     for id_val in all_relevant_ids:
-    #         value = "true" if id_val in checked_ids else "false"
-    #         # Ensure text inputs don't accidentally overwrite checkbox/radio state if IDs clash (unlikely but safe)
-    #         if id_val not in form_data_dict or form_data_dict[id_val] in [
-    #             "true",
-    #             "false",
-    #         ]:
-    #             form_data_dict[id_val] = value
-    #     # --- Format the output ---
-    #     # Sort keys for consistent output order (optional, but good practice)
-    #     output_parts = [f"{k}%01{v}" for k, v in sorted(form_data_dict.items())]
-    #     # return form_data_dict, "%02".join(output_parts)
-    #     return form_data_dict
-
-    @staticmethod
     def _remove_html_tags(text):
-        """Removes HTML tags from a string, converting <br> to newline."""
+        """Removes HTML tags from a string, preserving newlines and paragraph structure."""
         if text is None:
             return ""
-        # Convert <br> tags (and their entity forms) to newlines first
-        # Using regex for <br> tags as well for robustness
+
+        # Convert various types of line breaks and paragraph tags to newlines
+        # Handle <br> tags
         text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
-        # Use regex to remove any remaining tags
-        clean = re.compile("<.*?>")
-        # Strip leading/trailing whitespace after tag removal
-        return re.sub(clean, "", text).strip()
+
+        # Handle paragraph tags - add double newlines for paragraph separation
+        text = re.sub(r"<p[^>]*>", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"</p>", "\n\n", text, flags=re.IGNORECASE)
+
+        # Handle div tags similarly to paragraphs
+        text = re.sub(r"<div[^>]*>", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"</div>", "\n\n", text, flags=re.IGNORECASE)
+
+        # Handle list items - add newlines
+        text = re.sub(r"<li[^>]*>", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"</li>", "\n", text, flags=re.IGNORECASE)
+
+        # Handle headers - add newlines after them
+        text = re.sub(r"<h[1-6][^>]*>", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"</h[1-6]>", "\n\n", text, flags=re.IGNORECASE)
+
+        # Convert any sequences of &nbsp; to regular spaces
+        text = re.sub(r"(&nbsp;)+", " ", text, flags=re.IGNORECASE)
+
+        # Remove any remaining tags
+        text = re.sub(r"<[^>]+>", "", text)
+
+        # Clean up excess whitespace
+        # Replace multiple spaces with single space
+        text = re.sub(r" +", " ", text)
+
+        # Replace more than 2 consecutive newlines with just 2
+        text = re.sub(r"\n{3,}", "\n\n", text)
+
+        # Strip leading/trailing whitespace but preserve internal newlines
+        return text.strip()
 
     @staticmethod
     def _extract_form_data_bs(full_html_string):
@@ -2142,10 +2091,16 @@ PRINT
             tag_name = element.name.lower()
             # --- Textareas ---
             if tag_name == "textarea":
-                # Use get_text() which handles basic entity decoding and gets text within tags
-                raw_text = element.get_text()
-                # Further clean up <br> and potential leftover tags
-                cleaned_value = OncoEmrIntegration._remove_html_tags(raw_text)
+                # Get the raw content including HTML tags
+                # Use .string, .text, or join the contents to preserve HTML
+                raw_content = ""
+
+                # Method 1: If the textarea has mixed content (text nodes and tags)
+                for content in element.contents:
+                    raw_content += str(content)
+
+                # Now clean up the HTML tags while preserving line breaks
+                cleaned_value = OncoEmrIntegration._remove_html_tags(raw_content)
                 form_data_dict[element_id] = cleaned_value
             # --- Inputs (Text, Checkbox, Radio, Hidden) ---
             elif tag_name == "input":
