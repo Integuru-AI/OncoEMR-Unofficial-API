@@ -772,12 +772,31 @@ PRINT
     #
     #     return text_fields
 
-    async def generic_notes_submit(self, note_name: str, patient_id: str, fields: dict, created_on: str = None):
+    async def generic_notes_submit(self, note_name: str, patient_id: str, fields: dict, created_on: str = None, forward_to: str = None):
         # created_on: MM/DD/YYYY
         note_inputs = await self.generic_notes_fetch(
             note_name=note_name,
             patient_id=patient_id,
         )
+
+        if forward_to:
+            all_physicians = await self._get_physicians()
+            forwarding_physician = next(
+                (
+                    item
+                    for item in all_physicians
+                    if item.get("UserId") == forward_to
+                ),
+                None,
+            )
+            if forwarding_physician is None:
+                raise IntegrationAPIError(
+                    integration_name=self.integration_name,
+                    status_code=500,
+                    error_code="server_error",
+                    message=f"No physician found with ID `{forward_to}`",
+                )
+
         note_types = await self._fetch_available_note_types()
         selected_note = next(
             (
@@ -882,6 +901,23 @@ PRINT
                 error_code="server_error",
                 message=f"Failed to process note: {response}",
             )
+
+    async def _forward_note(self, forward_to, note_name, patient_id, selected_note):
+        forward_params = {
+            'AJAX': '1',
+            '__OS': f'{self.group_id}~{self.user_id}~{patient_id}',
+            'M': 'sForwardRS',
+            'P0': f'[{forward_to}%02%01{selected_note['value']}%01{note_name}%01%01{patient_id}%01{self.group_id}]',
+            '_': f'{int(time.time() * 1000)}',
+        }
+        path = self.url + "/pages_pd/PD_DocForwardDB.aspx"
+        forward_response = await self._make_request('GET', path, params=forward_params, headers=self.headers)
+        fr_data = json.loads(forward_response)
+        if fr_data.get('Success'):
+            forward_status = True
+        else:
+            forward_status = False
+        return forward_status
 
     async def generic_notes_fetch(self, note_name: str, patient_id: str):
         await self._verify_patient_exists(patient_id=patient_id)
@@ -1184,6 +1220,10 @@ PRINT
         # --- Clean and Combine ---
         specific_label_text = OncoEmrIntegration._get_cleaned_text(specific_label_tag)
         section_header_text = OncoEmrIntegration._get_cleaned_text(section_header_tag)
+
+        if specific_label_text and specific_label_text.lower().strip() == "this is invisible":
+            if specific_label_tag.select_one('font').get('color') == '#ffffff':
+                specific_label_text = None
 
         # Combine if both exist
         if section_header_text and specific_label_text:
