@@ -943,7 +943,6 @@ PRINT
             note_id=selected_note["value"], patient_id=patient_id
         )
         note_soup = self._create_soup(note_page)
-        # note_fields = self._extract_form_text_fields(note_page=note_page, note_type=selected_note)
         existing_data = self._extract_form_data_bs(note_page)
 
         id_label_pairs = {}
@@ -957,9 +956,12 @@ PRINT
                     continue
                 if "**" in label.lower():
                     continue
+                if "grid" in key.lower():
+                    continue
 
-                id_label_pairs[key] = label
-                label_value_pairs[label] = value
+                new_key = key.replace('FD_txt', '')
+                id_label_pairs[key] = new_key
+                label_value_pairs[new_key] = value
 
         result = {
             "patient_id": patient_id,
