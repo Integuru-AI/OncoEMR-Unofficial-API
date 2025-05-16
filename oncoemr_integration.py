@@ -772,7 +772,7 @@ PRINT
     #
     #     return text_fields
 
-    async def generic_notes_submit(self, note_name: str, patient_id: str, fields: dict, created_on: str = None, forward_to: str = None):
+    async def generic_notes_submit(self, note_name: str, patient_id: str, fields: dict, created_on: str = None, forward_to: str = None, note_category: str = None):
         # created_on: MM/DD/YYYY
         note_inputs = await self.generic_notes_fetch(
             note_name=note_name,
@@ -829,6 +829,10 @@ PRINT
         note_form_id_elem = note_soup.select_one("input#txtFormID")
         note_form_id = note_form_id_elem.get("value")
 
+        if note_category is None:
+            note_category_elem = note_soup.select_one("input#txtCategory")
+            note_category = note_category_elem.get("value")
+
         date_pattern = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$")
         if created_on:
             # First check basic format with regex
@@ -868,7 +872,7 @@ background%02
 %02
 PRINT%02
 {note_guid}%02
-MD Visit Note%02
+{note_category}%02
 {applied_string}%02
 PRINT
         """
@@ -963,9 +967,13 @@ PRINT
                 id_label_pairs[key] = new_key
                 label_value_pairs[new_key] = value
 
+        note_category_elem = note_soup.select_one("input#txtCategory")
+        note_category = note_category_elem.get("value")
+
         result = {
             "patient_id": patient_id,
             "note_name": selected_note["text"],
+            "note_category": note_category,
             "id_label": id_label_pairs,
             "label_value": label_value_pairs,
         }
