@@ -142,7 +142,7 @@ class OncoEmrIntegration(Integration):
             return
 
         demographics = await self._basic_patient_demographics_data(patient_id)
-        if demographics.get("patientId"):
+        if demographics is not None:
             return
 
         raise IntegrationAPIError(
