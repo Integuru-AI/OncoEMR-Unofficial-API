@@ -141,8 +141,8 @@ class OncoEmrIntegration(Integration):
         if header_data.get("PatientMrn") or header_data.get("PatientDisplayName"):
             return
 
-        patient_status = await self._patient_status_info(patient_id=patient_id)
-        if patient_status.get("id"):
+        demographics = await self._basic_patient_demographics_data(patient_id)
+        if demographics.get("patientId"):
             return
 
         raise IntegrationAPIError(
@@ -294,8 +294,6 @@ class OncoEmrIntegration(Integration):
         await self._verify_patient_exists(patient_id=patient_id)
 
         demographics = await self._basic_patient_demographics_data(patient_id)
-        status_info = await self._patient_status_info(patient_id)
-
         if demographics is None:
             return {
                 "success": False,
@@ -343,23 +341,15 @@ class OncoEmrIntegration(Integration):
             "record_number": demographics.get("mrn"),
             "ssn": demographics.get("ssn"),
             "affiliated_tribe": demographics.get("tribalAffiliation"),
-            # "is_tribe_member": demographics.get(''),
             "marital_status": demographics.get("maritalStatusCode"),
             "employer": employer,
             "occupation": occupation,
-            # "occupation_date": demographics.get(''),
             "industry": industry,
             "preferred_clinic": pref_clinic,
             "status": status,
             "advance_directive": advance_directive,
             "is_test_patient": demographics.get("isTestPatient"),
             "benefit_status": benefit,
-            # "due": due_value,
-            # "balance": balance_value,
-            # "copay": copay_value,
-            "last_login": status_info.get("lastLogin"),
-            "user_id": status_info.get("userId"),
-            "email": status_info.get("email"),
         }
 
         return data
