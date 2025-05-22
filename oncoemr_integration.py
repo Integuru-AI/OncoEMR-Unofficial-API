@@ -176,18 +176,24 @@ class OncoEmrIntegration(Integration):
 
         return processed
 
-    async def fetch_visit_list(self, doctor_id: str, selected_date: str | None):
+    async def fetch_visit_list(self, doctor_ids: List[str], selected_date: str | None):
         doctors_list = await self.fetch_physicians()
-        this_doctor = next(
-            (doctor for doctor in doctors_list if doctor.get("id") == doctor_id), None
-        )
-        if this_doctor is None:
-            raise IntegrationAPIError(
-                integration_name=self.integration_name,
-                error_code="not_found",
-                status_code=404,
-                message=f"Doctor not found for ID: `{doctor_id}",
+        providers = []
+        for doctor_id in doctor_ids:
+            this_doctor = next(
+                (doctor for doctor in doctors_list if doctor.get("id") == doctor_id), None
             )
+            if this_doctor is None:
+                raise IntegrationAPIError(
+                    integration_name=self.integration_name,
+                    error_code="not_found",
+                    status_code=404,
+                    message=f"Doctor not found for ID: `{doctor_id}",
+                )
+
+            providers.append(doctor_id)
+
+        providers_str = ",".join(providers)
 
         path = f"{self.url}/VisitList/UpdateVisitList"
 
@@ -197,10 +203,10 @@ class OncoEmrIntegration(Integration):
         first_param = {
             "sVisitDate": f"{selected_date}",
             "sLocID": -1,
-            "sResource": f"{doctor_id}",
+            "sResource": f"{providers_str}",
             "bNewLocation": False,
             "bNewResource": True,
-            "sMDUID": f"{doctor_id}",
+            "sMDUID": f"{providers_str}",
             "bShowPatLocCol": "True",
             "bMDVisitsOnly": "True",
             "bHideUnscheduled": "True",
