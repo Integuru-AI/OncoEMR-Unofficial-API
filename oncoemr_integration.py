@@ -37,12 +37,12 @@ from submodule_integrations.oncoemr.oncoemr_mapping import (
 
 class OncoEmrIntegration(Integration):
     def __init__(
-        self,
-        domain: str,
-        token: str,
-        location_id: str,
-        network_requester=None,
-        user_agent: str = UserAgent().random,
+            self,
+            domain: str,
+            token: str,
+            location_id: str,
+            network_requester=None,
+            user_agent: str = UserAgent().random,
     ):
         super().__init__("oncoemr")
         self.user_agent = user_agent
@@ -63,12 +63,12 @@ class OncoEmrIntegration(Integration):
 
     @classmethod
     async def create(
-        cls,
-        domain: str,
-        token: str,
-        location_id: str,
-        network_requester=None,
-        user_agent: str = UserAgent().random,
+            cls,
+            domain: str,
+            token: str,
+            location_id: str,
+            network_requester=None,
+            user_agent: str = UserAgent().random,
     ):
         """Async factory method that ensures state data is loaded before returning the instance"""
         instance = cls(
@@ -82,7 +82,7 @@ class OncoEmrIntegration(Integration):
         return instance
 
     async def _make_request(
-        self, method: str, url: str, **kwargs
+            self, method: str, url: str, **kwargs
     ) -> dict | str | bytes:
         if self.network_requester is not None:
             response = await self.network_requester.request(
@@ -430,7 +430,7 @@ class OncoEmrIntegration(Integration):
         return note_data
 
     async def _get_note_pdf_file(
-        self, patient_id: str, note_id: str
+            self, patient_id: str, note_id: str
     ) -> dict[str, str | bytes]:
         note_data = await self._get_note_data(patient_id, note_id)
         note_path = note_data.get("presignedUrl")
@@ -673,14 +673,22 @@ PRINT
 
         return cleaned
 
-    async def _get_note_page(self, note_id: str, patient_id: str):
+    async def _get_note_page(self, template_id: str, patient_id: str, note_id: str = None):
         path = self.url + "//WebForms/PD_DocOncoNoteDB.aspx"
-        params = {
-            "FID": f"{note_id}",
-            "__OS": f"{self.group_id}~{self.user_id}~{patient_id}",
-            "_SK": "",
-            "__full": "true",
-        }
+        if note_id:
+            params = {
+                "NID": f"{note_id}",
+                "__OS": f"{self.group_id}~{self.user_id}~{patient_id}",
+                "_SK": "",
+                "__full": "true",
+            }
+        else:
+            params = {
+                "FID": f"{template_id}",
+                "__OS": f"{self.group_id}~{self.user_id}~{patient_id}",
+                "_SK": "",
+                "__full": "true",
+            }
         response = await self._make_request(
             "GET", path, params=params, headers=self.headers
         )
@@ -768,7 +776,8 @@ PRINT
     #
     #     return text_fields
 
-    async def generic_notes_submit(self, note_name: str, patient_id: str, fields: dict, created_on: str = None, forward_to: str = None, note_category: str = None):
+    async def generic_notes_submit(self, note_name: str, patient_id: str, fields: dict, created_on: str = None,
+                                   forward_to: str = None, note_category: str = None):
         # created_on: MM/DD/YYYY
         note_inputs = await self.generic_notes_fetch(
             note_name=note_name,
@@ -802,8 +811,9 @@ PRINT
             ),
             None,
         )
+        cur_note_id = await self._fetch_latest_note_id(patient_id=patient_id, note_name=note_name)
         note_page = await self._get_note_page(
-            note_id=selected_note["value"], patient_id=patient_id
+            template_id=selected_note["value"], patient_id=patient_id, note_id=cur_note_id
         )
         existing_data = self._extract_form_data_bs(note_page)
 
@@ -851,9 +861,12 @@ PRINT
                     message=f"Invalid date for `created_on`: {created_on}. Date doesn't exist.",
                 )
 
+        if cur_note_id:
+            created_on = None
+
         param_string = f"""
-%02
-%02
+{cur_note_id if cur_note_id else ''}%02
+{cur_note_id if cur_note_id else ''}%02
 {note_name.replace(' ', '')}%02
 {note_name}%02
 {created_on if created_on else self._get_current_date()}%02
@@ -939,8 +952,9 @@ PRINT
                 message=f"Note `{note_name}` not found",
             )
 
+        cur_note_id = await self._fetch_latest_note_id(patient_id=patient_id, note_name=note_name)
         note_page = await self._get_note_page(
-            note_id=selected_note["value"], patient_id=patient_id
+            template_id=selected_note["value"], patient_id=patient_id, note_id=cur_note_id
         )
         note_soup = self._create_soup(note_page)
         existing_data = self._extract_form_data_bs(note_page)
@@ -974,6 +988,53 @@ PRINT
             "label_value": label_value_pairs,
         }
         return result
+
+    async def _fetch_latest_note_id(self, patient_id: str, note_name: str):
+        endpoint = "/WebForms/pages_pd/PD_DocMDMain.aspx"
+        path = self.url + endpoint
+        params = {
+            "PID": f"{patient_id}",
+            "locationId": f"{self.location_id}",
+            "__OS": f"{self.group_id}~{self.user_id}~{patient_id}",
+            # "sPageInfo": json.dumps({
+            #     "bReloading": False,
+            #     "sRequestedPage": f"~{endpoint}?PID={patient_id}&locationId={self.location_id}&__OS=GH_Jz169169247_2~UID_067YNQBAS60SNR4XCB6H~DH_HL711230511595823_73",
+            #     "sRequestedPageDesc": "", "bNewPatient": False, "sSessionKey": "",
+            #     "bAddToHistory": True,
+            #     "oAttr": {
+            #         "bIsPatientPage": True, "bReloadOnNewPatient": False,
+            #         "sHelpFileName": "", "sTitle": "", "sLocName": "", "bShowFind": True,
+            #         "bHidePatient": False, "sController": "", "sAction": "",
+            #         "sOnload": "PD_VISITLIST.localStartup"
+            #     }
+            # }),
+            "_PP": 1,
+            "_": str(int(time.time() * 1000)),
+        }
+        response = await self._make_request(
+            "GET", path, params=params, headers=self.headers
+        )
+        soup = self._create_soup(response)
+
+        unsigned_notes_tab = soup.select_one("div#pnlEditUnsigned")
+        note_anchors = unsigned_notes_tab.select("a.PDMenu")
+
+        latest_anchor = None
+        for anchor in note_anchors:
+            anchor_name = anchor.text.strip()
+            anchor_name = anchor_name.split(" ", 1)[1]
+            if self._fuzzy_compare(note_name, anchor_name):
+                latest_anchor = anchor
+                break
+
+        if latest_anchor is None:
+            return None
+
+        onclick = latest_anchor.get("onclick")
+        match = re.search(r'editDoc\("([^"]+)"\)', onclick)
+        doc_id = match.group(1) if match else None
+        print(f"Latest note ID for ({note_name}): {doc_id}")
+        return doc_id
 
     @staticmethod
     def _generic_notes_merge_id_to_value(id_label: dict, label_value: dict):
@@ -1054,9 +1115,9 @@ PRINT
             prev_sibling = current.previous_sibling
             while prev_sibling:
                 if (
-                    isinstance(prev_sibling, bs4.Tag)
-                    and prev_sibling.name == "table"
-                    and "margin-left" in prev_sibling.get("style", "")
+                        isinstance(prev_sibling, bs4.Tag)
+                        and prev_sibling.name == "table"
+                        and "margin-left" in prev_sibling.get("style", "")
                 ):
                     # Check if it actually contains the question-name span structure
                     if prev_sibling.select_one("td.bold_text_bar > span.question-name"):
@@ -1104,7 +1165,7 @@ PRINT
 
     @staticmethod
     def _get_label_for_textarea(
-        textarea_id: str, soup: bs4.BeautifulSoup
+            textarea_id: str, soup: bs4.BeautifulSoup
     ) -> Optional[str]:
         """
         Finds the label for a textarea, including its section header,
@@ -1142,8 +1203,8 @@ PRINT
                 soup.find(
                     "a",
                     id=lambda x: x
-                    and x.startswith("inlineEditButton")
-                    and field_name in x,
+                                 and x.startswith("inlineEditButton")
+                                 and field_name in x,
                 )
             )
             # Looser check for edit button if ID doesn't match exactly
@@ -1211,14 +1272,14 @@ PRINT
                 True
             )  # Find previous TAG sibling
             if prev_tag and (
-                (
-                    prev_tag.name == "span"
-                    and "SectionDivider" in prev_tag.get("class", [])
-                )
-                or (
-                    prev_tag.name == "h2"
-                    and "container-name-header" in prev_tag.get("class", [])
-                )
+                    (
+                            prev_tag.name == "span"
+                            and "SectionDivider" in prev_tag.get("class", [])
+                    )
+                    or (
+                            prev_tag.name == "h2"
+                            and "container-name-header" in prev_tag.get("class", [])
+                    )
             ):
                 section_header_tag = prev_tag
         # --- End Section Header Search ---
@@ -1254,7 +1315,7 @@ PRINT
 
         for note_type in note_types:
             note_page = await self._get_note_page(
-                note_id=note_type["value"], patient_id=patient_id
+                template_id=note_type["value"], patient_id=patient_id
             )
             text_fields.extend(self._extract_form_text_fields(note_page, note_type))
 
@@ -1322,9 +1383,9 @@ PRINT
                 prev_sibling = current_element.previous_sibling
                 while prev_sibling and not label:
                     if (
-                        isinstance(prev_sibling, bs4.Comment)
-                        and "begin question" in str(prev_sibling)
-                        and field_name in str(prev_sibling)
+                            isinstance(prev_sibling, bs4.Comment)
+                            and "begin question" in str(prev_sibling)
+                            and field_name in str(prev_sibling)
                     ):
                         # Found the comment, now look for the table with question-name span
                         tables = soup.find_all(
@@ -1333,7 +1394,7 @@ PRINT
                         for table in tables:
                             # Check if this table is close to our comment
                             if table.previous_sibling and prev_sibling in str(
-                                table.previous_sibling
+                                    table.previous_sibling
                             ):
                                 name_span = table.select_one("span.question-name")
                                 if name_span:
@@ -1411,7 +1472,7 @@ PRINT
                 {
                     "param": field_id,
                     "label": label
-                    or field_name,  # Default to field name if no label found
+                             or field_name,  # Default to field name if no label found
                     "note": note_type["text"],
                 }
             )
@@ -1491,7 +1552,7 @@ PRINT
             "__OS": f"{self.group_id}~{self.user_id}~{patient_id}",
             "M": "sSaveRS",
             "P0": f'[{code}{code_data.get("LongDescription")}{add_type}{self._get_current_date()}'
-            f"{patient_id}{code}]",
+                  f"{patient_id}{code}]",
             "_": f"{time.time() * 1000}",
         }
         path = self.url + "/pages_pd/PD_DiagnosisOncologyICD10DB.aspx"
@@ -1540,7 +1601,7 @@ PRINT
         return response
 
     async def make_order_entry(
-        self, patient_id: str, order_name: str, order_type: str, order_date: str
+            self, patient_id: str, order_name: str, order_type: str, order_date: str
     ):
         await self._verify_patient_exists(patient_id=patient_id)
 
@@ -1809,7 +1870,7 @@ PRINT
         }
 
     async def search_patient_by_names(
-        self, first_name: str = "", last_name: str = "", mrn: str = ""
+            self, first_name: str = "", last_name: str = "", mrn: str = ""
     ) -> list[dict]:
         params = {
             "Length": "0",
@@ -1940,8 +2001,8 @@ PRINT
     @staticmethod
     def _verify_note_str(data):
         # The pattern: "background" followed by \u0001, then "DH_" followed by alphanumeric characters,
-        # then another \u0001, then the same "DH_" pattern again
-        pattern = r"^background\u0001(DH_[A-Z0-9]+)\u0001\1$"
+        # then another \u0001, then another "DH_" pattern (same or different)
+        pattern = r"^background\u0001(DH_[A-Z0-9]+)\u0001(DH_[A-Z0-9]+)$"
 
         match = re.match(pattern, data)
         return bool(match)
@@ -2116,8 +2177,8 @@ PRINT
                     # Important: Don't overwrite a checkbox/radio state if an input text has the same ID
                     # (though usually separate IDs like FD_chk... and FD_itb... are used)
                     if not (
-                        element_id in form_data_dict
-                        and form_data_dict[element_id] in ["true", "false"]
+                            element_id in form_data_dict
+                            and form_data_dict[element_id] in ["true", "false"]
                     ):
                         form_data_dict[element_id] = value
                 elif input_type in ["checkbox", "radio"]:
