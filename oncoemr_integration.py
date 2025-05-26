@@ -1022,6 +1022,12 @@ PRINT
         unsigned_notes_tab = soup.select_one("div#pnlEditUnsigned")
         note_anchors = unsigned_notes_tab.select("a.PDMenu")
 
+        """
+        Logic: 
+            - If provided 'note name' not within the 10 most recently opened, default to the first note.
+            - If no opened notes exist for patient, return None to default to template using note name.  
+        """
+
         latest_anchor = None
         for anchor in note_anchors:
             anchor_name = anchor.text.strip()
@@ -1030,7 +1036,7 @@ PRINT
                 latest_anchor = anchor
                 break
 
-        if get_newest and latest_anchor is None:
+        if get_newest and latest_anchor is None and note_anchors:
             latest_anchor = note_anchors[0]
 
         if latest_anchor is None:
