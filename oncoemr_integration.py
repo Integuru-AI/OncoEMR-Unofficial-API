@@ -980,16 +980,19 @@ PRINT
         note_category_elem = note_soup.select_one("input#txtCategory")
         note_category = note_category_elem.get("value")
 
+        updated_note_name_elem = note_soup.select_one("span#spnPageTitle")
+        updated_note_name = updated_note_name_elem.text.strip()
+
         result = {
             "patient_id": patient_id,
-            "note_name": selected_note["text"],
+            "note_name": updated_note_name,
             "note_category": note_category,
             "id_label": id_label_pairs,
             "label_value": label_value_pairs,
         }
         return result
 
-    async def _fetch_latest_note_id(self, patient_id: str, note_name: str):
+    async def _fetch_latest_note_id(self, patient_id: str, note_name: str, get_newest: bool = True):
         endpoint = "/WebForms/pages_pd/PD_DocMDMain.aspx"
         path = self.url + endpoint
         params = {
@@ -1026,6 +1029,9 @@ PRINT
             if self._fuzzy_compare(note_name, anchor_name):
                 latest_anchor = anchor
                 break
+
+        if get_newest and latest_anchor is None:
+            latest_anchor = note_anchors[0]
 
         if latest_anchor is None:
             return None
