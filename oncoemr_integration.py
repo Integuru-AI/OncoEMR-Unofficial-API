@@ -642,26 +642,26 @@ PRINT
 
     async def _fetch_available_note_types(self):
         params = {
-            "locationId": f"{self.location_id}",
-            "_PP": 1,
-            "_": str(int(time.time() * 1000)),
+            'FT': 'VisitNote',
+            'AJAX': '1',
+            # '__OS': f'{self.group_id}~{self.user_id}',
+            'M': 'sSwitchListRS',
+            'P0': '[ShowAll]',
+            '_': f'{int(time.time() * 1000)}',
         }
-        path = self.url + "/WebForms/pages_pd/PD_DocMDMain.aspx"
+        path = self.url + "/WebForms/OncoEMR.aspx"
         response = await self._make_request(
             "GET", path, params=params, headers=self.headers
         )
-        soup = self._create_soup(response)
-
-        select = soup.select_one("select#ucFormTemplatesList_ddlItemList")
+        soup = self._create_soup(response.get("Payload"))
         options = []
 
         # Extract all option elements
-        if select:
-            for option in select.find_all("option"):
-                if len(option.get("value")) > 0:
-                    options.append(
-                        {"value": option.get("value", ""), "text": option.text.strip()}
-                    )
+        for option in soup.find_all("option"):
+            if len(option.get("value")) > 0:
+                options.append(
+                    {"value": option.get("value", ""), "text": option.text.strip()}
+                )
 
         return options
 
