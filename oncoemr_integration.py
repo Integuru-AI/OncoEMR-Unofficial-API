@@ -812,6 +812,10 @@ PRINT
             None,
         )
         cur_note_id = await self._fetch_latest_note_id(patient_id=patient_id, note_name=note_name)
+        if "secure31" not in self.url:
+            print(f"creating brand new note on {self.url}")
+            cur_note_id = None
+
         note_page = await self._get_note_page(
             template_id=selected_note["value"], patient_id=patient_id, note_id=cur_note_id
         )
@@ -953,6 +957,10 @@ PRINT
             )
 
         cur_note_id = await self._fetch_latest_note_id(patient_id=patient_id, note_name=note_name)
+        if "secure31" not in self.url:
+            print(f"creating brand new note on {self.url}")
+            cur_note_id = None
+
         note_page = await self._get_note_page(
             template_id=selected_note["value"], patient_id=patient_id, note_id=cur_note_id
         )
