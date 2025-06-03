@@ -2115,45 +2115,54 @@ PRINT
 
     @staticmethod
     def _remove_html_tags(text):
-        """Removes HTML tags from a string, preserving newlines and paragraph structure."""
-        if text is None:
+        """
+        Sanitize HTML content to prevent XSS attacks while preserving rich text formatting
+        
+        Args:
+            text: Raw HTML content
+            
+        Returns:
+            Sanitized HTML content with rich text preserved
+        """
+        if not text:
             return ""
 
-        # Convert various types of line breaks and paragraph tags to newlines
-        # Handle <br> tags
-        text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+        # Convert line break elements to consistent format before parsing
+        text = re.sub(r"<br\s*/?>", "<br>", text, flags=re.IGNORECASE)
+        text = re.sub(r"</p>", "</p><br>", text, flags=re.IGNORECASE)
+        text = re.sub(r"</div>", "</div><br>", text, flags=re.IGNORECASE)
 
-        # Handle paragraph tags - add double newlines for paragraph separation
-        text = re.sub(r"<p[^>]*>", "", text, flags=re.IGNORECASE)
-        text = re.sub(r"</p>", "\n\n", text, flags=re.IGNORECASE)
+        # Allow rich text tags
+        allowed_tags = ['b', 'strong', 'i', 'em', 'u', 'a', 'br', 'p', 'div', 'span', 'ul', 'ol', 'li']
+        allowed_attributes = {
+            'a': ['href', 'title'],
+            'div': ['style'],
+            'span': ['style'],
+            'ul': ['style'],
+            'ol': ['style'],
+            'li': ['style']
+        }
 
-        # Handle div tags similarly to paragraphs
-        text = re.sub(r"<div[^>]*>", "", text, flags=re.IGNORECASE)
-        text = re.sub(r"</div>", "\n\n", text, flags=re.IGNORECASE)
+        soup = BeautifulSoup(text, 'html.parser')
 
-        # Handle list items - add newlines
-        text = re.sub(r"<li[^>]*>", "", text, flags=re.IGNORECASE)
-        text = re.sub(r"</li>", "\n", text, flags=re.IGNORECASE)
+        # Remove disallowed tags
+        for tag in soup.find_all():
+            if tag.name not in allowed_tags:
+                tag.unwrap()
+            else:
+                # Remove disallowed attributes
+                allowed_attrs = allowed_attributes.get(tag.name, [])
+                attrs_to_remove = [attr for attr in tag.attrs if attr not in allowed_attrs]
+                for attr in attrs_to_remove:
+                    del tag[attr]
 
-        # Handle headers - add newlines after them
-        text = re.sub(r"<h[1-6][^>]*>", "", text, flags=re.IGNORECASE)
-        text = re.sub(r"</h[1-6]>", "\n\n", text, flags=re.IGNORECASE)
+        result = str(soup)
 
-        # Convert any sequences of &nbsp; to regular spaces
-        text = re.sub(r"(&nbsp;)+", " ", text, flags=re.IGNORECASE)
+        # Clean up excess line breaks
+        result = re.sub(r"<br>\s*<br>", "<br>", result)
+        result = re.sub(r"(&nbsp;)+", " ", result, flags=re.IGNORECASE)
 
-        # Remove any remaining tags
-        text = re.sub(r"<[^>]+>", "", text)
-
-        # Clean up excess whitespace
-        # Replace multiple spaces with single space
-        text = re.sub(r" +", " ", text)
-
-        # Replace more than 2 consecutive newlines with just 2
-        text = re.sub(r"\n{3,}", "\n\n", text)
-
-        # Strip leading/trailing whitespace but preserve internal newlines
-        return text.strip()
+        return result.strip()
 
     @staticmethod
     def _extract_form_data_bs(full_html_string):
@@ -2184,10 +2193,11 @@ PRINT
 
                 # Method 1: If the textarea has mixed content (text nodes and tags)
                 for content in element.contents:
-                    raw_content += str(content)
+                    raw_content += f"{str(content)}"
 
                 # Now clean up the HTML tags while preserving line breaks
-                cleaned_value = OncoEmrIntegration._remove_html_tags(raw_content)
+                cleaned_value = raw_content
+                # cleaned_value = OncoEmrIntegration._remove_html_tags(raw_content)
                 form_data_dict[element_id] = cleaned_value
             # --- Inputs (Text, Checkbox, Radio, Hidden) ---
             elif tag_name == "input":
