@@ -2196,9 +2196,7 @@ PRINT
                     raw_content += f"{str(content)}"
 
                 # Now clean up the HTML tags while preserving line breaks
-                cleaned_value = raw_content
-                # cleaned_value = OncoEmrIntegration._remove_html_tags(raw_content)
-                form_data_dict[element_id] = cleaned_value
+                form_data_dict[element_id] = raw_content
             # --- Inputs (Text, Checkbox, Radio, Hidden) ---
             elif tag_name == "input":
                 input_type = element.get("type", "").lower()
