@@ -694,88 +694,6 @@ PRINT
         )
         return response
 
-    # async def extract_all_text_fields(self, patient_id: str):
-    #     note_types = await self._fetch_available_note_types()
-    #     text_fields = []
-    #     seen_fields = set()  # Track field IDs we've already processed
-    #
-    #     for note_type in note_types:
-    #         note_page = await self._get_note_page(note_id=note_type['value'], patient_id=patient_id)
-    #         soup = self._create_soup(note_page)
-    #         note_content = soup.select_one('div#noteContent')
-    #         fd_elements = note_content.find_all(id=lambda x: x and x.startswith('FD_txt'))
-    #
-    #         for element in fd_elements:
-    #             tag_name = element.name.lower()
-    #             field_id = element.get('id')
-    #
-    #             # Skip if we've already processed this field ID
-    #             if field_id in seen_fields:
-    #                 continue
-    #
-    #             # Add to seen set
-    #             seen_fields.add(field_id)
-    #
-    #             # Extract only textareas
-    #             if tag_name == 'textarea':
-    #                 # Try to find the label for this textarea
-    #                 label = None
-    #
-    #                 # Get the field name from the id (remove the 'FD_txt' prefix)
-    #                 field_name = field_id.replace('FD_txt', '')
-    #
-    #                 # Find question tables that might contain the label
-    #                 # Look for the question table with this field name
-    #                 question_tables = soup.find_all('table', attrs={'style': 'margin-left:10px'})
-    #
-    #                 for table in question_tables:
-    #                     # Check if this table is for our field by looking at nearby HTML comments
-    #                     comment = None
-    #                     previous_sibling = table.previous_sibling
-    #                     while previous_sibling and not comment:
-    #                         if isinstance(previous_sibling, str) and 'begin question' in previous_sibling:
-    #                             comment = previous_sibling
-    #                         previous_sibling = previous_sibling.previous_sibling
-    #
-    #                     if comment and field_name in comment:
-    #                         # This is likely the table for our field, find the label
-    #                         label_span = table.find('span', class_='question-name')
-    #                         if label_span:
-    #                             label = label_span.text.strip()
-    #                             if label.endswith(':'):
-    #                                 label = label[:-1]  # Remove trailing colon
-    #                             break
-    #
-    #                 # If we still don't have a label, try looking at nearby elements more broadly
-    #                 if not label:
-    #                     # Look for any span with class 'question-name' in the vicinity
-    #                     # First, find the div that contains this textarea
-    #                     containing_div = soup.find('div', id=f'div{field_name}')
-    #                     if containing_div:
-    #                         # Look for the closest previous span with class 'question-name'
-    #                         prev_elem = containing_div.find_previous('span', class_='question-name')
-    #                         if prev_elem:
-    #                             label = prev_elem.text.strip()
-    #                             if label.endswith(':'):
-    #                                 label = label[:-1]  # Remove trailing colon
-    #
-    #                 # Add both the ID and label to our results
-    #                 text_fields.append({
-    #                     'id': field_id,
-    #                     'label': label or field_name,  # If no label found, use the field name
-    #                     'note': note_type['text'],
-    #                 })
-    #
-    #     # Write results to file
-    #     with open('text_fields.txt', 'w', encoding='utf-8') as f:
-    #         for field in text_fields:
-    #             if field['label']:
-    #                 f.write(f"{field['id']}\t{field['label']}\n")
-    #             else:
-    #                 f.write(f"{field['id']}\n")
-    #
-    #     return text_fields
-
     async def generic_notes_submit(self, note_name: str, patient_id: str, fields: dict, created_on: str = None,
                                    forward_to: str = None, note_category: str = None):
         # created_on: MM/DD/YYYY
@@ -821,14 +739,28 @@ PRINT
         )
         existing_data = self._extract_form_data_bs(note_page)
 
-        merged_input = self._generic_notes_merge_id_to_value(
-            id_label=note_inputs["id_label"],
-            label_value=fields,
+        # break down `fields` into `textfields`, `radio_buttons`, and `checkboxes`
+        submit_textfields = fields.get("textfields")
+        submit_radio_buttons = fields.get("radio_buttons")
+        submit_checkboxes = fields.get("checkboxes")
+
+        merged_input = self._notes_textfields_merge_id_to_value(
+            id_label=note_inputs["textfield_data"]["text_id_label"],
+            label_value=submit_textfields,
         )
         applied_data = self._generic_notes_merge_new_with_existing(
             merged_input=merged_input,
             existing_data=existing_data,
         )
+
+        # convert the radio button and checkboxes dict to expected form with correct id prefix
+        radio_buttons_data = self._prepare_toggle_input_dict(data=submit_radio_buttons, prefix="FD_rdo")
+        checkboxes_data = self._prepare_toggle_input_dict(data=submit_checkboxes, prefix="FD_chk")
+
+        # merge new checkbox and radio button values into existing data
+        applied_data.update(radio_buttons_data)
+        applied_data.update(checkboxes_data)
+
         applied_parts = [f"{k}%01{v}" for k, v in applied_data.items()]
         applied_string = "%02".join(applied_parts)
 
@@ -958,6 +890,7 @@ PRINT
 
         cur_note_id = await self._fetch_latest_note_id(patient_id=patient_id, note_name=note_name)
         if "secure31" not in self.url:
+            # allow direct note edits on secure31 only. other envs prefer creating new copies
             print(f"creating brand new note on {self.url}")
             cur_note_id = None
 
@@ -967,10 +900,14 @@ PRINT
         note_soup = self._create_soup(note_page)
         existing_data = self._extract_form_data_bs(note_page)
 
-        id_label_pairs = {}
-        label_value_pairs = {}
+        textfield_id_label_pairs = {}
+        textfield_label_value_pairs = {}
+
+        checkbox_pairs = {}
+        radio_button_collection = {}
+
         for key, value in existing_data.items():
-            if "FD_txt" in key:
+            if "fd_txt" in key.lower():
                 label = self._get_label_for_textarea(textarea_id=key, soup=note_soup)
                 if label is None:
                     continue
@@ -982,8 +919,38 @@ PRINT
                     continue
 
                 new_key = key.replace('FD_txt', '')
-                id_label_pairs[key] = new_key
-                label_value_pairs[new_key] = value
+                textfield_id_label_pairs[key] = new_key
+                textfield_label_value_pairs[new_key] = value
+
+            if "fd_chk" in key.lower():
+                chk_box_label = self._get_label_for_input_button(inp_id=key, soup=note_soup)
+                if chk_box_label is None:
+                    continue
+
+                new_key = key.replace('FD_chk', '')
+                checkbox_pairs[new_key] = {
+                    "label": chk_box_label,
+                    "value": value == "true",
+                }
+
+            if "fd_rdo" in key.lower():
+                rdo_group_name = self._get_radio_button_group_name(rdo_id=key, soup=note_soup)
+                if rdo_group_name is None:
+                    continue
+                rdo_group_name = rdo_group_name.replace('FD_rdo', '')
+                rdo_group_dict = radio_button_collection.get(rdo_group_name, {})
+
+                rdo_btn_label = self._get_label_for_input_button(inp_id=key, soup=note_soup)
+                if rdo_btn_label is None:
+                    continue
+
+                new_key = key.replace('FD_rdo', '')
+                rdo_group_dict[new_key] = {
+                    "label": rdo_btn_label,
+                    "value": value == "true",
+                }
+
+                radio_button_collection[rdo_group_name] = rdo_group_dict
 
         note_category_elem = note_soup.select_one("input#txtCategory")
         note_category = note_category_elem.get("value")
@@ -995,8 +962,12 @@ PRINT
             "patient_id": patient_id,
             "note_name": updated_note_name,
             "note_category": note_category,
-            "id_label": id_label_pairs,
-            "label_value": label_value_pairs,
+            "textfield_data": {
+                "text_id_label": textfield_id_label_pairs,
+                "text_label_value": textfield_label_value_pairs
+            },
+            "radio_button_data": radio_button_collection,
+            "checkbox_data": checkbox_pairs,
         }
         return result
 
@@ -1007,18 +978,6 @@ PRINT
             "PID": f"{patient_id}",
             "locationId": f"{self.location_id}",
             "__OS": f"{self.group_id}~{self.user_id}~{patient_id}",
-            # "sPageInfo": json.dumps({
-            #     "bReloading": False,
-            #     "sRequestedPage": f"~{endpoint}?PID={patient_id}&locationId={self.location_id}&__OS=GH_Jz169169247_2~UID_067YNQBAS60SNR4XCB6H~DH_HL711230511595823_73",
-            #     "sRequestedPageDesc": "", "bNewPatient": False, "sSessionKey": "",
-            #     "bAddToHistory": True,
-            #     "oAttr": {
-            #         "bIsPatientPage": True, "bReloadOnNewPatient": False,
-            #         "sHelpFileName": "", "sTitle": "", "sLocName": "", "bShowFind": True,
-            #         "bHidePatient": False, "sController": "", "sAction": "",
-            #         "sOnload": "PD_VISITLIST.localStartup"
-            #     }
-            # }),
             "_PP": 1,
             "_": str(int(time.time() * 1000)),
         }
@@ -1057,7 +1016,32 @@ PRINT
         return doc_id
 
     @staticmethod
-    def _generic_notes_merge_id_to_value(id_label: dict, label_value: dict):
+    def _prepare_toggle_input_dict(data: dict, prefix: str):
+        updated = {}
+
+        for key, value in data.items():
+            updated[f"{prefix}{key}"] = "true" if value else "false"
+
+        return updated
+
+    @staticmethod
+    def _get_radio_button_group_name(rdo_id: str, soup: BeautifulSoup):
+        rdo_button = soup.find("input", {"id": rdo_id, "type": "radio"})
+        if rdo_button:
+            return rdo_button.get("name")
+
+        return None
+
+    @staticmethod
+    def _get_label_for_input_button(inp_id: str, soup: BeautifulSoup):
+        label_elem = soup.find("label", {"for": inp_id})
+        if label_elem:
+            return label_elem.text.strip()
+
+        return None
+
+    @staticmethod
+    def _notes_textfields_merge_id_to_value(id_label: dict, label_value: dict):
         """
         Merges id_label and label_value dictionaries to create an id_value dictionary.
 
@@ -1499,21 +1483,21 @@ PRINT
 
         return text_fields
 
-    async def process_generic_note(self, note_name: str, template: CatchAllModel):
-        all_note_types = await self._fetch_available_note_types()
-        selected_note_type = None
-        for note_type in all_note_types:
-            if self._fuzzy_compare(note_type["text"], note_name):
-                selected_note_type = note_type
-                break
-
-        if selected_note_type is None:
-            raise IntegrationAPIError(
-                integration_name=self.integration_name,
-                status_code=404,
-                error_code="not_found",
-                message=f"Note `{note_name}` not found for this domain.",
-            )
+    # async def process_generic_note(self, note_name: str, template: CatchAllModel):
+    #     all_note_types = await self._fetch_available_note_types()
+    #     selected_note_type = None
+    #     for note_type in all_note_types:
+    #         if self._fuzzy_compare(note_type["text"], note_name):
+    #             selected_note_type = note_type
+    #             break
+    #
+    #     if selected_note_type is None:
+    #         raise IntegrationAPIError(
+    #             integration_name=self.integration_name,
+    #             status_code=404,
+    #             error_code="not_found",
+    #             message=f"Note `{note_name}` not found for this domain.",
+    #         )
 
     @staticmethod
     def _fuzzy_compare(str1, str2):
