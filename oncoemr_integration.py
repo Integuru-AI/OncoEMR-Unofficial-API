@@ -396,17 +396,23 @@ class OncoEmrIntegration(Integration):
         note_elems = soup.select("a.PDMenu")
         notes_list = []
 
-        pattern = r'window\.openDocumentViewer\("([^"]+)",\s*"([^"]+)"'
+        pattern1 = r'editDoc\("([^"]+)"\)'
+        pattern2 = r'window\.openDocumentViewer\("([^"]+)",\s*"([^"]+)"'
+
         for note_elem in note_elems:
             name = note_elem.text.strip()
             onclick = note_elem.get("onclick")
+            note_id = None
 
-            match = re.search(pattern, onclick)
-
+            # Try first pattern
+            match = re.search(pattern1, onclick)
             if match:
-                note_id = match.group(2)
+                note_id = match.group(1)
             else:
-                note_id = None
+                # Try second pattern
+                match = re.search(pattern2, onclick)
+                if match:
+                    note_id = match.group(2)
 
             data = {
                 "name": name,
@@ -435,12 +441,6 @@ class OncoEmrIntegration(Integration):
         note_data = await self._get_note_data(patient_id, note_id)
         note_path = note_data.get("presignedUrl")
 
-        # headers = {
-        #     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        #     "Accept-Encoding": "gzip, deflate",
-        #     "Referer": f"{self.url}/",
-        # }
-        # response = await self._make_request("GET", note_path, headers=headers)
         return {
             "data": note_data,
             "file": note_path,
@@ -2013,11 +2013,11 @@ PRINT
 
     @staticmethod
     def _apply_template_to_dict(
-        template_model: FollowupNoteTemplateModel | ConsultationNoteTemplateModel,
-        target_dict: Dict[str, str],
-        radio_buttons_mapping: Dict,
-        checkboxes_mapping: Dict,
-        textfields_mapping: Dict,
+            template_model: FollowupNoteTemplateModel | ConsultationNoteTemplateModel,
+            target_dict: Dict[str, str],
+            radio_buttons_mapping: Dict,
+            checkboxes_mapping: Dict,
+            textfields_mapping: Dict,
     ) -> Dict[str, str]:
         """
         Apply the template model to the target dictionary, handling both text fields and radio buttons.
@@ -2101,10 +2101,10 @@ PRINT
     def _remove_html_tags(text):
         """
         Sanitize HTML content to prevent XSS attacks while preserving rich text formatting
-        
+
         Args:
             text: Raw HTML content
-            
+
         Returns:
             Sanitized HTML content with rich text preserved
         """
