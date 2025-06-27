@@ -761,6 +761,10 @@ PRINT
         applied_data.update(radio_buttons_data)
         applied_data.update(checkboxes_data)
 
+        # merge direct id updates from operator into existing data
+        direct_updates = fields.get("direct_updates")
+        applied_data.update(direct_updates)
+
         applied_parts = [f"{k}%01{v}" for k, v in applied_data.items()]
         applied_string = "%02".join(applied_parts)
 
@@ -952,6 +956,38 @@ PRINT
 
                 radio_button_collection[rdo_group_name] = rdo_group_dict
 
+        # logic for checkboxes within tables
+        tables_collection = {}
+        grid_tables = note_soup.select('table[id*="Grid"]')
+        fax_table = note_soup.select_one('table[id="tblFaxRecipients"]')
+        if fax_table:
+            grid_tables.append(fax_table)
+
+        for grid_table in grid_tables:
+            if grid_table is None:
+                # completely not needed but left on purpose just in case
+                # already had it trigger an error on one random note type
+                continue
+
+            table_data = self._parse_grid_table(table=grid_table)
+            if len(table_data) == 0:
+                continue
+
+            table_id = grid_table.get('id')
+            table_id = table_id.replace('tbl', '')
+
+            tables_collection[table_id] = table_data
+
+        # logic for pain scale selection
+        pain_scale_collection = {}
+        pain_scale_table = note_soup.select_one('table#tbl_gsGSPaiComparativePainScale')
+        if pain_scale_table is not None:
+            pain_scale_table_data = [row.text.strip() for row in pain_scale_table.select('tr')]
+            for row in pain_scale_table_data:
+                if '\n' in row:
+                    _, v = row.split('\n')
+                    pain_scale_collection[v] = False
+
         note_category_elem = note_soup.select_one("input#txtCategory")
         note_category = note_category_elem.get("value")
 
@@ -968,6 +1004,8 @@ PRINT
             },
             "radio_button_data": radio_button_collection,
             "checkbox_data": checkbox_pairs,
+            "tables_data": tables_collection,
+            "pain_scale_data": pain_scale_collection,
         }
         return result
 
@@ -1014,6 +1052,81 @@ PRINT
         doc_id = match.group(1) if match else None
         print(f"Latest note ID for ({note_name}): {doc_id}")
         return doc_id
+
+    @staticmethod
+    def _parse_grid_table(table: bs4.Tag):
+        """
+        Parse table with checkboxes into structured data.
+
+        Args:
+            table (str): HTML grid table
+
+        Returns:
+            list: List of row dictionaries with checkbox and column data
+        """
+        # Get header row to map column positions
+        header_row = table.select_one('tr th')
+        headers = []
+        if header_row:
+            headers = [th.get_text(strip=True).lower() for th in table.select('tr th')]
+
+        rows = []
+        data_rows = table.select('tr[id]')  # Any row with an ID
+
+        for row in data_rows:
+            checkboxes = row.select('input[type="Checkbox"]')
+            enabled_checkboxes = []
+
+            for checkbox in checkboxes:
+                if checkbox.get('disabled'):
+                    continue
+                else:
+                    # Find which cell contains this checkbox
+                    parent_cell = checkbox.find_parent('td')
+                    cell_index = 0
+                    if parent_cell:
+                        all_cells = row.select('td')
+                        cell_index = all_cells.index(parent_cell)
+
+                    column_name = headers[cell_index] if cell_index < len(headers) else f"column_{cell_index}"
+
+                    checkbox_data = {
+                        'id': checkbox.get('id', '').replace('FD_chk', ''),
+                        'value': checkbox.has_attr('checked'),
+                        'column': column_name.replace(' ', '_').replace('-', '_')
+                    }
+                    enabled_checkboxes.append(checkbox_data)
+
+            # Skip row if no enabled checkboxes
+            if not enabled_checkboxes:
+                continue
+
+            row_data = {'checkboxes': enabled_checkboxes}
+
+            # Try ID-based extraction first (more reliable)
+            cells = row.select('td[id^="td_"]')
+            if cells:
+                for cell in cells:
+                    cell_id = cell.get('id', '')
+                    # Extract column name from ID pattern (td_..._ColumnName)
+                    parts = cell_id.split('_')
+                    if len(parts) >= 3:
+                        column_name = parts[-1].lower()
+                        row_data[column_name] = cell.get_text(strip=True)
+            else:
+                # Fallback to position-based extraction using headers
+                all_cells = row.select('td')
+                # Skip cells with checkboxes
+                checkbox_cells = len([cell for cell in all_cells if cell.select('input[type="Checkbox"]')])
+                for i, cell in enumerate(all_cells[checkbox_cells:], checkbox_cells):
+                    header_idx = i - checkbox_cells
+                    if header_idx < len(headers):
+                        header = headers[header_idx].replace(' ', '_').replace('-', '_')
+                        row_data[header] = cell.get_text(strip=True)
+
+            rows.append(row_data)
+
+        return rows
 
     @staticmethod
     def _prepare_toggle_input_dict(data: dict, prefix: str):
