@@ -1698,7 +1698,7 @@ PRINT
 
         return response
 
-    async def _fetch_patient_orders(self, patient_id: str):
+    async def _fetch_patient_orders_html(self, patient_id: str):
         path = self.url + f"/{self.group_id}/PatientOrders"
         referrer = self.url + "/nav/treatment-plan?PID=" + patient_id
         headers = self.headers.copy()
@@ -2416,7 +2416,7 @@ PRINT
         return patients
 
     @staticmethod
-    def _get_current_date():
+    def _get_current_date(pattern: str = "%m/%d/%Y"):
         """
         Get the current date formatted as 'MM/DD/YYYY' (e.g., '03/18/2025')
 
@@ -2426,9 +2426,189 @@ PRINT
         current_date = datetime.now()
 
         # Use strftime with format specifiers for leading zeros
-        formatted_date = current_date.strftime("%m/%d/%Y")
+        formatted_date = current_date.strftime(pattern)
 
         return formatted_date
+
+    async def _fetch_patient_treatment_plan(self, patient_id: str):
+        params = {
+            "patientId": patient_id,
+            "disableTpUiChanges": "false",
+        }
+        path = self.url + "/TreatmentPlan/ModelJson"
+        response = await self._make_request(method="POST", url=path, params=params, headers=self.headers)
+        return response
+    
+    async def _fetch_patient_orders_json(self, patient_id: str, order_id: str):
+        payload = {
+            "OrderIds": [order_id],
+            "PatientIds": [patient_id],
+            "includeHasSchedulerResource": False,
+        }
+        path = self.url + "/PatientOrders2"
+        response = await self._make_request(method="POST", url=path, json=payload, headers=self.headers)
+        return response
+
+    async def _fetch_activity_order_dialog(self, patient_id: str, order_id: str):
+        params = {
+            'TID': '',
+            'PCID': f'{order_id}',
+            'DT': f'{self._get_current_date("%m-%d-%Y")}',
+            'CID': f'{order_id}',
+            'FRM': 'Treatment Plan',
+            '__modal': 'true',
+            '__OS': f'{self.group_id}~{self.user_id}~{patient_id}',
+            '_SK': '',
+            '__NL': '0',
+        }
+        path = self.url + "/WebForms/pages_pd/PD_TPActivityEditDB.aspx"
+        response = await self._make_request(method="GET", url=path, params=params, headers=self.headers)
+        return response
+
+    async def set_new_cpt_code(self, patient_id: str, cpt_code: str):
+        await self._verify_patient_exists(patient_id=patient_id)
+
+        # go over the treatment plan and find the order info for the md visit
+        treatment_plan = await self._fetch_patient_treatment_plan(patient_id=patient_id)
+        general_flowsheet: dict = next(fs for fs in treatment_plan["flowsheets"] if fs["name"] == "General")
+
+        try:
+            today_index = treatment_plan["dates"].index(treatment_plan["today"])
+            md_candidates = [
+                comp for comp in general_flowsheet["components"]
+                if comp["cells"][today_index] is not None
+                and comp["cells"][today_index]["value"] != "*"
+            ]
+        except ValueError:
+            raise IntegrationAPIError(
+                integration_name=self.integration_name,
+                message=f"No visit/activity found for patient ID today [{treatment_plan['today']}].",
+                status_code=400,
+                error_code="not_found"
+            )
+
+        # Find the component with matching doctor last name
+        doctors = await self.fetch_physicians()
+        md_component = None
+        for component in md_candidates:
+            cells = component["cells"]
+            today_cell = cells[today_index]
+            cell_value = today_cell.get("value", "")
+            if "view" in cell_value.lower():
+                # this is to ignore hidden events
+                continue
+
+            provider_name = cell_value.split("/")[0]
+            if any(provider_name in doc["last_name"] for doc in doctors):
+                print(today_cell)
+                md_component = component
+                break
+
+        if md_component is None:
+            raise IntegrationAPIError(
+                integration_name=self.integration_name,
+                message=f"No MD component found for patient ID today [{treatment_plan['today']}]."
+                        f"\nCandidates: {md_candidates}",
+                status_code=500,
+                error_code="server_error"
+            )
+
+        order_id = md_component["protCompID"]
+        order_data = await self._fetch_patient_orders_json(patient_id=patient_id, order_id=order_id)
+        if len(order_data) == 0:
+            raise IntegrationAPIError(
+                integration_name=self.integration_name,
+                message=f"No orders found for order id {order_id}. [{patient_id}]",
+                status_code=500,
+                error_code="server_error"
+            )
+
+        item_1 = order_data[0].get('Item1')
+        modal_html = await self._fetch_activity_order_dialog(patient_id=patient_id, order_id=order_id)
+        modal_soup = self._create_soup(modal_html)
+
+        # validate new code
+        code_select_elem = modal_soup.select_one("select#ddlChargeCodes")
+        select_options_elems = code_select_elem.find_all("option")
+        charge_codes = [option.get("value") for option in select_options_elems]
+
+        if cpt_code not in charge_codes:
+            raise IntegrationAPIError(
+                integration_name=self.integration_name,
+                message=f"Invalid CPT code: `{cpt_code}`",
+                status_code=400,
+                error_code="request_error"
+            )
+
+        location_name = modal_soup.select_one("span#lblLocation").text.strip()
+        flowsheet_name = modal_soup.select_one("span#lblFlowsheet").text.strip()
+        row_id = modal_soup.select_one("input#orderComponentId").get("value")
+        physician_name = modal_soup.select_one("span#spanOrderingMD").text.strip()
+        cpt_quantity = modal_soup.select_one("input[name='txtCPTQty']").get("value", "1")
+        note_id = modal_soup.select_one("input#txtNoteID").get("value", "")
+        cycle_day_info = modal_soup.select_one("input#txtCD").get("value", "")
+        kit_qty = modal_soup.select_one("input#txtKitQty").get("value", "0")
+        supply_kit = modal_soup.select_one("input#txtSupplyKit").get("value", "")
+
+        date_in = self._get_current_date("%m/%d/%Y")
+
+        # build request to save new cptCode
+        p0_body = [
+            {
+                'action': 'save',
+                'patientId': f'{patient_id}',
+                'rowId': f'{row_id}',
+                'originalOrderSetName': f'{flowsheet_name}',
+                'originalLocationName': f'{location_name}',
+                'activityName': f'{item_1.get("OrderName")}',
+                'icd': f'{item_1.get("IcdTenCodesCommaDelimited")}',
+                'newDate': f'{date_in} 12:00 AM',
+                'selectedMD': f'{physician_name}',
+                'selectedMDID': f'{item_1.get("OrderingClinicianUserId")}',
+                'value': f'{item_1.get("OrderingClinicianUserId")}',
+                'changeFor': 'DateOnly',
+                'priority': f'{item_1.get("Priority")}',
+                'frequency': '1',
+                'instructions': f'{item_1.get("Instructions")}',
+                'orderSetId': '-1',
+                'orderSetName': f'{flowsheet_name}',
+                'cptCode': f'{cpt_code}',
+                'cptQuantity': f'{cpt_quantity}',
+                'supplyKit': f'{supply_kit}',
+                'kitQuantity': f'{kit_qty}',
+                'locationId': f'{item_1.get("LocationId")}',
+                'locationName': f'{location_name}',
+                'duration': f'{item_1.get("PlannedDurationMinutes")}',
+                'sequence': f'{item_1.get("Sequence")}',
+                'cycleDayInfo': f'{cycle_day_info}',
+                'noteId': f'{note_id}',
+                'dataName': '',
+                'signoffParam': '',
+                'changeReason': '',
+                'comment': '',
+                'mdpList': '',
+                'isExtender': 'false',
+                'orderingMDUID': f'{item_1.get("OrderingClinicianUserId")}',
+                'newOrderingMDUID': f'{item_1.get("OrderingClinicianUserId")}',
+                'referral': '',
+                'requiresAuth': 'False',
+                'isActivityLocationInHouse': False,
+                'isActivityLocationOutside': False,
+                'activityLocation': ''
+            }
+        ]
+        payload = {
+            "AJAX": 1,
+            "__OS": f'{self.group_id}~{self.user_id}~{patient_id}',
+            "P0": json.dumps(p0_body),
+        }
+        params = {
+            'M': 'sSaveRecordRS',
+        }
+        path = self.url + "/pages_pd/PD_TPActivityEditDB.aspx"
+
+        response = await self._make_request(method="POST", url=path, params=params, data=payload, headers=self.headers)
+        return response
 
     @staticmethod
     def _create_soup(html_content) -> BeautifulSoup:
