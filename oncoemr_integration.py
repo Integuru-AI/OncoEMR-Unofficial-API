@@ -988,6 +988,16 @@ PRINT
                     _, v = row.split('\n')
                     pain_scale_collection[v] = False
 
+        # logic for phq scale on secure30
+        phq_scale_collection = {}
+        phq_scale_table = note_soup.select_one('table#tbl_gsGSDepPHQ-9')
+        if phq_scale_table is not None:
+            phq_scale_table_data = [row.text.strip() for row in phq_scale_table.select('tr')]
+            for row in phq_scale_table_data:
+                if '\n' in row:
+                    v = row.replace('\n', '~ ')
+                    phq_scale_collection[v] = False
+
         note_category_elem = note_soup.select_one("input#txtCategory")
         note_category = note_category_elem.get("value")
 
@@ -1006,6 +1016,7 @@ PRINT
             "checkbox_data": checkbox_pairs,
             "tables_data": tables_collection,
             "pain_scale_data": pain_scale_collection,
+            "phq_scale_data": phq_scale_collection,
         }
         return result
 
@@ -1595,22 +1606,6 @@ PRINT
             )
 
         return text_fields
-
-    # async def process_generic_note(self, note_name: str, template: CatchAllModel):
-    #     all_note_types = await self._fetch_available_note_types()
-    #     selected_note_type = None
-    #     for note_type in all_note_types:
-    #         if self._fuzzy_compare(note_type["text"], note_name):
-    #             selected_note_type = note_type
-    #             break
-    #
-    #     if selected_note_type is None:
-    #         raise IntegrationAPIError(
-    #             integration_name=self.integration_name,
-    #             status_code=404,
-    #             error_code="not_found",
-    #             message=f"Note `{note_name}` not found for this domain.",
-    #         )
 
     @staticmethod
     def _fuzzy_compare(str1, str2):
