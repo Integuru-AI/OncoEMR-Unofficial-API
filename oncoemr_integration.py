@@ -2353,7 +2353,7 @@ PRINT
             # Extract patient ID and name from row attributes
             pid = row.get("pid", "")
             p_name = row.get("pnam", "")
-            location = row.get("Location", "")
+            location = row.get("location", "")
 
             patient_data["patient_id"] = pid
             patient_data["patient_name"] = p_name
@@ -2382,18 +2382,18 @@ PRINT
                             )
                         else:
                             patient_data["appointment_time"] = cell.get_text().strip()
-                    elif i == 1:
-                        # Patient info - redundant with row attribute, but keeping for completion
-                        patient_link = cell.find("a")
+                    elif "patient" in header_key or cell.find("a", id=lambda x: x and x.startswith("ancp")):
+                        # Patient info cell - look for patient link and MRN
+                        patient_link = cell.find("a", id=lambda x: x and x.startswith("ancp"))
                         if patient_link:
                             patient_data["patient_display"] = (
                                 patient_link.get_text().strip()
                             )
 
-                            # Extract MRN number if present
-                            span = patient_link.find("span")
-                            if span:
-                                patient_data["mrn"] = span.get_text().strip()
+                            # Extract MRN from span within patient link
+                            mrn_span = patient_link.find("span")
+                            if mrn_span:
+                                patient_data["mrn"] = mrn_span.get_text().strip()
                     else:
                         # Get all text, preserving internal structure but as a string
                         patient_data[header_key] = cell.get_text().strip()
