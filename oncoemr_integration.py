@@ -124,7 +124,7 @@ class OncoEmrIntegration(Integration):
             )
 
     async def _load_state_data(self):
-        path = self.url + "/nav/visit-list"
+        path = self.url + "/nav"
         response = await self._make_request("GET", path, headers=self.headers)
         soup = self._create_soup(response)
 
