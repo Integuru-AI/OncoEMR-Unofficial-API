@@ -893,10 +893,6 @@ PRINT
             )
 
         cur_note_id = await self._fetch_latest_note_id(patient_id=patient_id, note_name=note_name)
-        if "secure31" not in self.url:
-            # allow direct note edits on secure31 only. other envs prefer creating new copies
-            print(f"creating brand new note on {self.url}")
-            cur_note_id = None
 
         note_page = await self._get_note_page(
             template_id=selected_note["value"], patient_id=patient_id, note_id=cur_note_id
@@ -982,21 +978,34 @@ PRINT
         pain_scale_collection = {}
         pain_scale_table = note_soup.select_one('table#tbl_gsGSPaiComparativePainScale')
         if pain_scale_table is not None:
+            pain_score_elem = note_soup.select_one('input#FD_gsGSPaiComparativePainScale')
+            pain_score = pain_score_elem.get('value') if pain_score_elem else ''
+
             pain_scale_table_data = [row.text.strip() for row in pain_scale_table.select('tr')]
             for row in pain_scale_table_data:
                 if '\n' in row:
-                    _, v = row.split('\n')
-                    pain_scale_collection[v] = False
+                    k, v = row.split('\n')
+                    if k == pain_score:
+                        pain_scale_collection[v] = True
+                    else:
+                        pain_scale_collection[v] = False
 
         # logic for phq scale on secure30
         phq_scale_collection = {}
         phq_scale_table = note_soup.select_one('table#tbl_gsGSDepPHQ-9')
         if phq_scale_table is not None:
+            phq_score_elem = note_soup.select_one('input#FD_gsGSDepPHQ-9')
+            phq_score = phq_score_elem.get('value') if phq_score_elem else ''
+
             phq_scale_table_data = [row.text.strip() for row in phq_scale_table.select('tr')]
             for row in phq_scale_table_data:
                 if '\n' in row:
+                    k, v = row.split('\n')
                     v = row.replace('\n', '~ ')
-                    phq_scale_collection[v] = False
+                    if phq_score == k.strip():
+                        phq_scale_collection[v] = True
+                    else:
+                        phq_scale_collection[v] = False
 
         note_category_elem = note_soup.select_one("input#txtCategory")
         note_category = note_category_elem.get("value")
