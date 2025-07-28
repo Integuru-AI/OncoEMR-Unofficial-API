@@ -732,6 +732,7 @@ PRINT
         cur_note_id = await self._fetch_latest_note_id(patient_id=patient_id, note_name=note_name)
         if "secure31" not in self.url:
             print(f"creating brand new note on {self.url}")
+            print(cur_note_id)
             cur_note_id = None
 
         note_page = await self._get_note_page(
@@ -835,7 +836,7 @@ PRINT
 
         headers = self.headers.copy()
         headers["Content-Type"] = "application/json"
-        headers["Referer"] = self.url + (f"//WebForms/PD_DocOncoNoteDB.aspx?FID={selected_note["value"]}&__OS="
+        headers["Referer"] = self.url + (f"//WebForms/PD_DocOncoNoteDB.aspx?FID={selected_note['value']}&__OS="
                                          f"{self.group_id}~{self.user_id}~{patient_id}&_SK=&__full=true")
 
         path = self.url + "/VisitNotes/AutoSaveVisitNote"
@@ -1061,8 +1062,8 @@ PRINT
                 latest_anchor = anchor
                 break
 
-        if get_newest and latest_anchor is None and note_anchors:
-            latest_anchor = note_anchors[0]
+        # if get_newest and latest_anchor is None and note_anchors:
+        #     latest_anchor = note_anchors[0]
 
         if latest_anchor is None:
             return None
