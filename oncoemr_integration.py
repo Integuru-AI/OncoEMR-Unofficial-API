@@ -738,6 +738,7 @@ PRINT
         note_page = await self._get_note_page(
             template_id=selected_note["value"], patient_id=patient_id, note_id=cur_note_id
         )
+        note_soup = self._create_soup(note_page)
         existing_data = self._extract_form_data_bs(note_page)
 
         # break down `fields` into `textfields`, `radio_buttons`, and `checkboxes`
@@ -749,7 +750,7 @@ PRINT
             id_label=note_inputs["textfield_data"]["text_id_label"],
             label_value=submit_textfields,
         )
-        applied_data = self._generic_notes_merge_new_with_existing(
+        updated_data = self._generic_notes_merge_new_with_existing(
             merged_input=merged_input,
             existing_data=existing_data,
         )
@@ -758,15 +759,47 @@ PRINT
         radio_buttons_data = self._prepare_toggle_input_dict(data=submit_radio_buttons, prefix="FD_rdo")
         checkboxes_data = self._prepare_toggle_input_dict(data=submit_checkboxes, prefix="FD_chk")
 
+        # get ONT template used for this note form
+        this_ont_template = self._parse_note_ont_template(note_soup)
+
         # merge new checkbox and radio button values into existing data
-        applied_data.update(radio_buttons_data)
-        applied_data.update(checkboxes_data)
+        updated_data.update(radio_buttons_data)
+        updated_data.update(checkboxes_data)
 
         # merge direct id updates from operator into existing data
         direct_updates = fields.get("direct_updates")
-        applied_data.update(direct_updates)
+        updated_data.update(direct_updates)
 
-        applied_parts = [f"{k}%01{v}" for k, v in applied_data.items()]
+        # check for itb data type values used
+        for k_id, k_value in direct_updates.items():
+            if "fd_itb" in k_id.lower():
+                elem = note_soup.select_one(f"input#{k_id}")
+                built_itb_text = self._build_text_with_ont_template(
+                    templates=this_ont_template,
+                    template_key=k_id.replace("FD_itb", ""),
+                    value=k_value
+                )
+                itb_print_loc = f"FD_txt{elem.get('prnt')}"
+                itb_print_to = updated_data.get(itb_print_loc)
+                itb_print_to += f"{built_itb_text}"
+
+                updated_data[itb_print_loc] = itb_print_to
+
+            if "fd_gs" in k_id.lower():
+                # specifically for pain and phq scale inputs
+                pain_scale_id = "FD_gsGSPaiComparativePainScale"
+                pain_scale_input = note_soup.select_one(f"input#{pain_scale_id}")
+                if k_id == pain_scale_id and pain_scale_input:
+                    prefix = this_ont_template.get(k_id.replace("FD_gs", ""))
+                    updated_data['FD_txtPain'] = f"{prefix} {k_value}"
+
+                # ignoring phq stuff; it doesn't follow a consistent pattern across onco envs
+                # phq_scale_id = "FD_gsGSDepPHQ"          # actually `FD_gsGSDepPHQ-9`
+                # if phq_scale_id in k_id:
+                #     prefix = this_ont_template.get(k_id.replace("FD_gs", ""))
+                #     updated_data['FD_txtDepPHQ-9'] = f"{prefix} {k_value}"
+
+        applied_parts = [f"{k}%01{v}" for k, v in updated_data.items()]
         applied_string = "%02".join(applied_parts)
 
         note_soup = self._create_soup(note_page)
@@ -933,6 +966,13 @@ PRINT
                     "label": chk_box_label,
                     "value": value == "true",
                 }
+                # check if checkbox has text input with type `FD_itb`
+                itb_id = key.replace('FD_chk', 'FD_itb')
+                if itb_id in existing_data:
+                    itb_elem = note_soup.select_one(f"input#{itb_id}")
+                    itb_value = itb_elem.get("oldvalue") if itb_elem else None
+                    # windy way, this is basically; value or old_value or ''
+                    checkbox_pairs[new_key]["text"] = existing_data.get(itb_id) or itb_value or ''
 
             if "fd_rdo" in key.lower():
                 rdo_group_name = self._get_radio_button_group_name(rdo_id=key, soup=note_soup)
@@ -1062,6 +1102,7 @@ PRINT
                 latest_anchor = anchor
                 break
 
+        # this bit is bugged, original reasoning forgotten
         # if get_newest and latest_anchor is None and note_anchors:
         #     latest_anchor = note_anchors[0]
 
@@ -1073,6 +1114,52 @@ PRINT
         doc_id = match.group(1) if match else None
         print(f"Latest note ID for ({note_name}): {doc_id}")
         return doc_id
+
+    @staticmethod
+    def _parse_note_ont_template(soup) -> Dict[str, str]:
+        """Parse oNT assignments from BeautifulSoup object, preserving %% placeholders"""
+        templates = {}
+
+        for script in soup.find_all('script'):
+            if script.string and 'oNT[' in script.string:
+                script_content = script.string
+
+                # Pattern to match: oNT['key']="value";
+                pattern = r'oNT\[([\'"])([^\1]+?)\1\]\s*=\s*([\'"])(.*?)\3;'
+                matches = re.finditer(pattern, script_content, re.DOTALL)
+
+                for match in matches:
+                    key = match.group(2)
+                    value = match.group(4)
+
+                    # Decode JavaScript string (handle unicode escapes, etc.)
+                    # Handle unicode escapes like \u0027 (single quote)
+                    def replace_unicode(match):
+                        return chr(int(match.group(1), 16))
+
+                    # Replace \uXXXX with actual characters
+                    decoded = re.sub(r'\\u([0-9a-fA-F]{4})', replace_unicode, value)
+
+                    # Handle other common escapes
+                    decoded = decoded.replace(r"\'", "'")
+                    decoded = decoded.replace(r'\"', '"')
+                    decoded = decoded.replace(r'\\', '\\')
+
+                    templates[key] = decoded  # Preserves %% placeholders
+
+        return templates
+
+    @staticmethod
+    def _build_text_with_ont_template(template_key: str, value: str, templates: Dict[str, str]) -> str:
+        """Build treatment text using a template and value"""
+        template = templates.get(template_key, "")
+
+        if "%%" in template:
+            return template.replace("%%", value)
+        elif template and value:
+            return f"{template} {value}"
+        else:
+            return template
 
     @staticmethod
     def _parse_grid_table(table: bs4.Tag):
