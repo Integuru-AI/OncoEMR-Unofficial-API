@@ -799,6 +799,21 @@ PRINT
                 #     prefix = this_ont_template.get(k_id.replace("FD_gs", ""))
                 #     updated_data['FD_txtDepPHQ-9'] = f"{prefix} {k_value}"
 
+        # go over checkboxes and find if they print to any textfield
+        for c_id, c_val in checkboxes_data.items():
+            if c_val is True or c_val == "true":
+                c_elem = note_soup.select_one(f"input#{c_id}")
+                prnt_location = c_elem.get("prnt")
+                label_elem = note_soup.find('label', {'for': c_id})
+                label = label_elem.text.strip() if label_elem else ""
+                prnt_location = f"FD_txt{prnt_location}"
+
+                if updated_data.get(prnt_location):
+                    og_val = updated_data.get(prnt_location)
+                    label = f"{og_val} {label}"
+
+                updated_data[prnt_location] = label
+
         applied_parts = [f"{k}%01{v}" for k, v in updated_data.items()]
         applied_string = "%02".join(applied_parts)
 
