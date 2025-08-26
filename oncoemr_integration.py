@@ -988,6 +988,8 @@ PRINT
                     itb_value = itb_elem.get("oldvalue") if itb_elem else None
                     # windy way, this is basically; value or old_value or ''
                     checkbox_pairs[new_key]["text"] = existing_data.get(itb_id) or itb_value or ''
+                    if checkbox_pairs[new_key]["text"]:
+                        checkbox_pairs[new_key]["value"] = True
 
             if "fd_rdo" in key.lower():
                 rdo_group_name = self._get_radio_button_group_name(rdo_id=key, soup=note_soup)
@@ -1041,10 +1043,10 @@ PRINT
             for row in pain_scale_table_data:
                 if '\n' in row:
                     k, v = row.split('\n')
-                    if k == pain_score:
-                        pain_scale_collection[v] = True
-                    else:
-                        pain_scale_collection[v] = False
+                    # if k == pain_score:
+                    #     pain_scale_collection[v] = True
+                    # else:
+                    pain_scale_collection[v] = False
 
         # logic for phq scale on secure30
         phq_scale_collection = {}
@@ -1058,10 +1060,10 @@ PRINT
                 if '\n' in row:
                     k, v = row.split('\n')
                     v = row.replace('\n', '~ ')
-                    if phq_score == k.strip():
-                        phq_scale_collection[v] = True
-                    else:
-                        phq_scale_collection[v] = False
+                    # if phq_score == k.strip():
+                    #     phq_scale_collection[v] = True
+                    # else:
+                    phq_scale_collection[v] = False
 
         note_category_elem = note_soup.select_one("input#txtCategory")
         note_category = note_category_elem.get("value")
