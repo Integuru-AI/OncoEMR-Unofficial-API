@@ -772,19 +772,8 @@ PRINT
 
         # check for itb data type values used
         for k_id, k_value in direct_updates.items():
-            if "fd_itb" in k_id.lower():
-                elem = note_soup.select_one(f"input#{k_id}")
-                built_itb_text = self._build_text_with_ont_template(
-                    templates=this_ont_template,
-                    template_key=k_id.replace("FD_itb", ""),
-                    value=k_value
-                )
-                itb_print_loc = f"FD_txt{elem.get('prnt')}"
-                itb_print_to = updated_data.get(itb_print_loc)
-                itb_print_to += f"{built_itb_text}"
-
-                updated_data[itb_print_loc] = itb_print_to
-
+            # itb data type only used with checkboxes currently
+            #   => itb processing moved into checkbox processing
             if "fd_gs" in k_id.lower():
                 # specifically for pain and phq scale inputs
                 pain_scale_id = "FD_gsGSPaiComparativePainScale"
@@ -807,6 +796,22 @@ PRINT
                 label_elem = note_soup.find('label', {'for': c_id})
                 label = label_elem.text.strip() if label_elem else ""
                 prnt_location = f"FD_txt{prnt_location}"
+
+                # handle itb data; checkbox text
+                itb_id = c_id.replace('FD_chk', 'FD_itb')
+                itb_value = direct_updates.get(itb_id)
+                if itb_value:
+                    checkbox_text = self._build_text_with_ont_template(
+                        templates=self._parse_note_ont_template(note_soup),
+                        template_key=c_id.replace('FD_chk', ''),
+                        value=itb_value
+                    )
+                    cur_text = updated_data.get(prnt_location)
+                    if cur_text:
+                        updated_data[prnt_location] = f"{cur_text} {checkbox_text}"
+                    else:
+                        updated_data[prnt_location] = checkbox_text
+                    continue
 
                 if updated_data.get(prnt_location):
                     og_val = updated_data.get(prnt_location)
