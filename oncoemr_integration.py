@@ -771,6 +771,12 @@ PRINT
         direct_updates = fields.get("direct_updates")
         updated_data.update(direct_updates)
 
+        # fix encoding for medications grid
+        medication_grid_data = updated_data.get("FD_grdMedicationsGrid")
+        if medication_grid_data:
+            medication_grid_data = self._quote_uppercase(medication_grid_data, safe="*()")
+            updated_data["FD_grdMedicationsGrid"] = medication_grid_data
+
         # check for itb data type values used
         for k_id, k_value in direct_updates.items():
             # itb data type only used with checkboxes currently
@@ -778,29 +784,53 @@ PRINT
             if "fd_gs" in k_id.lower():
                 # specifically for pain and phq scale inputs
                 pain_scale_id = "FD_gsGSPaiComparativePainScale"
-                pain_scale_input = note_soup.find("input", id=pain_scale_id)
+                pain_scale_input = note_soup.select_one(f"input#{pain_scale_id}")
                 if k_id == pain_scale_id and pain_scale_input:
                     prefix = this_ont_template.get(k_id.replace("FD_gs", ""))
                     updated_data['FD_txtPain'] = f"{prefix} {k_value}"
 
-                # ignoring phq stuff; it doesn't follow a consistent pattern across onco envs
-                # phq_scale_id = "FD_gsGSDepPHQ"          # actually `FD_gsGSDepPHQ-9`
-                # if phq_scale_id in k_id:
-                #     prefix = this_ont_template.get(k_id.replace("FD_gs", ""))
-                #     updated_data['FD_txtDepPHQ-9'] = f"{prefix} {k_value}"
+        for r_id, r_val in radio_buttons_data.items():
+            radio_elem = note_soup.find("input", id=r_id)
+            prnt_location = radio_elem.get("prnt")
+            if prnt_location:
+                r_val_str = f"{r_val}%01{prnt_location}"
+                updated_data[r_id] = r_val_str
+
+            itb_id = r_id.replace("FD_rdo", "FD_itb")
+            existing_itb_val = updated_data.get(itb_id)
+            if prnt_location and existing_itb_val is not None:
+                updated_data[itb_id] = f"{existing_itb_val if existing_itb_val else ''}%01{prnt_location}"
 
         # go over checkboxes and find if they print to any textfield
         for c_id, c_val in checkboxes_data.items():
+            c_elem = note_soup.find("input", id=c_id)
+            prnt_location = c_elem.get("prnt")
+            if prnt_location:
+                # append print location to value
+                c_val_str = f"{c_val}%01{prnt_location}"
+                updated_data[c_id] = c_val_str
+
+            # handle itb data; checkbox text
+            itb_id = c_id.replace('FD_chk', 'FD_itb')
+            itb_value = direct_updates.get(itb_id)
+            if prnt_location and itb_value:
+                # append print location to value
+                updated_data[itb_id] = f"{itb_value if itb_value else ''}%01{prnt_location}"
+
+            # append `undefined` for fax recipient checkbox strings
+            if "FaxRecipients" in c_id:
+                updated_data[c_id] = f"{updated_data.get(c_id)}%01undefined"
+
+            existing_itb_val = updated_data.get(itb_id)
+            if prnt_location and existing_itb_val is not None:
+                updated_data[itb_id] = f"{existing_itb_val if existing_itb_val else ''}%01{prnt_location}"
+
             if c_val is True or c_val == "true":
-                c_elem = note_soup.find("input", {"id": c_id})
-                prnt_location = c_elem.get("prnt")
                 label_elem = note_soup.find('label', {'for': c_id})
                 label = label_elem.text.strip() if label_elem else ""
                 prnt_location = f"FD_txt{prnt_location}"
 
-                # handle itb data; checkbox text
-                itb_id = c_id.replace('FD_chk', 'FD_itb')
-                itb_value = direct_updates.get(itb_id)
+                # # handle itb data; checkbox text
                 if itb_value:
                     checkbox_text = self._build_text_with_ont_template(
                         templates=self._parse_note_ont_template(note_soup),
@@ -820,7 +850,15 @@ PRINT
 
                 updated_data[prnt_location] = label
 
-        applied_parts = [f"{k}%01{v}" for k, v in updated_data.items()]
+        applied_parts = []
+        for k, v in updated_data.items():
+            # strip all `+` from text and encode spaces correctly
+            v = self._encode_spaces_only(v)
+            encoded_value = self._quote_uppercase(v, safe="%*()'")
+            # converting encoded single quotes to double quotes
+            encoded_value = encoded_value.replace("%27", '%22')
+            applied_parts.append(f"{k}%01{encoded_value}")
+
         applied_string = "%02".join(applied_parts)
 
         note_soup = self._create_soup(note_page)
@@ -863,24 +901,25 @@ PRINT
 {cur_note_id if cur_note_id else ''}%02
 {cur_note_id if cur_note_id else ''}%02
 {note_name.replace(' ', '')}%02
-{note_name}%02
-{created_on if created_on else self._get_current_date()}%02
+{self._encode_spaces_only(note_name)}%02
+{self._quote_uppercase((created_on if created_on else self._get_current_date()), safe='')}%02
 {note_form_id}%02
-background%02
-{note_name}%02
-{"" if created_on else self._get_current_date()}%02
+%02
+{self._encode_spaces_only(note_name)}%02
+{"" if created_on else self._quote_uppercase(self._get_current_date())}%02
 %02
 {self.group_id}%02
 {patient_id}%02
 %02
 %02
-PRINT%02
+%02
 {note_guid}%02
-{note_category}%02
+{self._encode_spaces_only(note_category)}%02
 {applied_string}%02
-PRINT
-        """
-        param_string = param_string.replace("\n", "").strip()
+        """.strip()
+        param_string = (param_string.replace("\n", "")
+                                    .replace('%3Cbr%2F%3E', '%3Cbr%3E')
+                                    .strip())
         query_json = {
             "sNameValues": param_string,
             "assessedDiagnosesData": "",
@@ -1139,8 +1178,20 @@ PRINT
         return doc_id
 
     @staticmethod
-    def encode_spaces_only(text):
-        return text.replace(' ', '%20') if text else ''
+    def _encode_spaces_only(text: str):
+        if not text:
+            return ""
+
+        # for some reason, onco uses `+` for spaces and `%2b` where actual `+` should be
+        # so we need to manually replace those with ` `
+        text = text.replace("+", " ")
+        return text.replace(" ", "%20")
+
+    @staticmethod
+    def _quote_uppercase(text, safe=''):
+        encoded = urllib.parse.quote(text, safe=safe)
+        # Convert %xx to %XX using regex
+        return re.sub(r'%([a-f0-9]{2})', lambda m: f'%{m.group(1).upper()}', encoded)
 
     @staticmethod
     def _parse_note_ont_template(soup) -> Dict[str, str]:
@@ -1561,25 +1612,25 @@ PRINT
             # print(f"Warning: No label components found for editable field: {textarea_id}")
             return field_name  # Return field name as last resort
 
-    async def extract_all_text_fields(self, patient_id: str):
-        note_types = await self._fetch_available_note_types()
-        text_fields = []
-
-        for note_type in note_types:
-            note_page = await self._get_note_page(
-                template_id=note_type["value"], patient_id=patient_id
-            )
-            text_fields.extend(self._extract_form_text_fields(note_page, note_type))
-
-        # Write results to file
-        with open("text_fields.txt", "w", encoding="utf-8") as f:
-            for field in text_fields:
-                if field["label"]:
-                    f.write(f"{field['id']}\t{field['label']}\n")
-                else:
-                    f.write(f"{field['id']}\n")
-
-        return text_fields
+    # async def extract_all_text_fields(self, patient_id: str):
+    #     note_types = await self._fetch_available_note_types()
+    #     text_fields = []
+    #
+    #     for note_type in note_types:
+    #         note_page = await self._get_note_page(
+    #             template_id=note_type["value"], patient_id=patient_id
+    #         )
+    #         text_fields.extend(self._extract_form_text_fields(note_page, note_type))
+    #
+    #     # Write results to file
+    #     with open("text_fields.txt", "w", encoding="utf-8") as f:
+    #         for field in text_fields:
+    #             if field["label"]:
+    #                 f.write(f"{field['id']}\t{field['label']}\n")
+    #             else:
+    #                 f.write(f"{field['id']}\n")
+    #
+    #     return text_fields
 
     @staticmethod
     def _extract_form_text_fields(note_page: str, note_type: dict) -> list[dict] | None:
@@ -2337,56 +2388,56 @@ PRINT
 
         return result_dict
 
-    @staticmethod
-    def _remove_html_tags(text):
-        """
-        Sanitize HTML content to prevent XSS attacks while preserving rich text formatting
-
-        Args:
-            text: Raw HTML content
-
-        Returns:
-            Sanitized HTML content with rich text preserved
-        """
-        if not text:
-            return ""
-
-        # Convert line break elements to consistent format before parsing
-        text = re.sub(r"<br\s*/?>", "<br>", text, flags=re.IGNORECASE)
-        text = re.sub(r"</p>", "</p><br>", text, flags=re.IGNORECASE)
-        text = re.sub(r"</div>", "</div><br>", text, flags=re.IGNORECASE)
-
-        # Allow rich text tags
-        allowed_tags = ['b', 'strong', 'i', 'em', 'u', 'a', 'br', 'p', 'div', 'span', 'ul', 'ol', 'li']
-        allowed_attributes = {
-            'a': ['href', 'title'],
-            'div': ['style'],
-            'span': ['style'],
-            'ul': ['style'],
-            'ol': ['style'],
-            'li': ['style']
-        }
-
-        soup = BeautifulSoup(text, 'html.parser')
-
-        # Remove disallowed tags
-        for tag in soup.find_all():
-            if tag.name not in allowed_tags:
-                tag.unwrap()
-            else:
-                # Remove disallowed attributes
-                allowed_attrs = allowed_attributes.get(tag.name, [])
-                attrs_to_remove = [attr for attr in tag.attrs if attr not in allowed_attrs]
-                for attr in attrs_to_remove:
-                    del tag[attr]
-
-        result = str(soup)
-
-        # Clean up excess line breaks
-        result = re.sub(r"<br>\s*<br>", "<br>", result)
-        result = re.sub(r"(&nbsp;)+", " ", result, flags=re.IGNORECASE)
-
-        return result.strip()
+    # @staticmethod
+    # def _remove_html_tags(text):
+    #     """
+    #     Sanitize HTML content to prevent XSS attacks while preserving rich text formatting
+    #
+    #     Args:
+    #         text: Raw HTML content
+    #
+    #     Returns:
+    #         Sanitized HTML content with rich text preserved
+    #     """
+    #     if not text:
+    #         return ""
+    #
+    #     # Convert line break elements to consistent format before parsing
+    #     text = re.sub(r"<br\s*/?>", "<br>", text, flags=re.IGNORECASE)
+    #     text = re.sub(r"</p>", "</p><br>", text, flags=re.IGNORECASE)
+    #     text = re.sub(r"</div>", "</div><br>", text, flags=re.IGNORECASE)
+    #
+    #     # Allow rich text tags
+    #     allowed_tags = ['b', 'strong', 'i', 'em', 'u', 'a', 'br', 'p', 'div', 'span', 'ul', 'ol', 'li']
+    #     allowed_attributes = {
+    #         'a': ['href', 'title'],
+    #         'div': ['style'],
+    #         'span': ['style'],
+    #         'ul': ['style'],
+    #         'ol': ['style'],
+    #         'li': ['style']
+    #     }
+    #
+    #     soup = BeautifulSoup(text, 'html.parser')
+    #
+    #     # Remove disallowed tags
+    #     for tag in soup.find_all():
+    #         if tag.name not in allowed_tags:
+    #             tag.unwrap()
+    #         else:
+    #             # Remove disallowed attributes
+    #             allowed_attrs = allowed_attributes.get(tag.name, [])
+    #             attrs_to_remove = [attr for attr in tag.attrs if attr not in allowed_attrs]
+    #             for attr in attrs_to_remove:
+    #                 del tag[attr]
+    #
+    #     result = str(soup)
+    #
+    #     # Clean up excess line breaks
+    #     result = re.sub(r"<br>\s*<br>", "<br>", result)
+    #     result = re.sub(r"(&nbsp;)+", " ", result, flags=re.IGNORECASE)
+    #
+    #     return result.strip()
 
     @staticmethod
     def _extract_form_data_bs(full_html_string):
@@ -2565,7 +2616,7 @@ PRINT
         path = self.url + "/TreatmentPlan/ModelJson"
         response = await self._make_request(method="POST", url=path, params=params, headers=self.headers)
         return response
-    
+
     async def _fetch_patient_orders_json(self, patient_id: str, order_id: str):
         payload = {
             "OrderIds": [order_id],
