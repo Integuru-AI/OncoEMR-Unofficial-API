@@ -5,6 +5,7 @@ import json
 import time
 import random
 import string
+import urllib
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Set
 
@@ -128,7 +129,7 @@ class OncoEmrIntegration(Integration):
         response = await self._make_request("GET", path, headers=self.headers)
         soup = self._create_soup(response)
 
-        data_script = soup.select_one("script#json\\:piwikOptions")
+        data_script = soup.find("script", id="json:piwikOptions")
         data = json.loads(data_script.text.strip())
         self.user_id = data.get("userId")
         self.group_id = data.get("groupId")
@@ -309,23 +310,23 @@ class OncoEmrIntegration(Integration):
         demo_html = await self._patient_demographics_html(patient_id)
         demo_soup = self._create_soup(demo_html)
 
-        employer_elem = demo_soup.select_one("span#lblEmployer")
+        employer_elem = demo_soup.find("span", id="lblEmployer")
         employer = employer_elem.text.strip() if employer_elem else None
-        occupation_elem = demo_soup.select_one("span#lblOccupation")
+        occupation_elem = demo_soup.find("span", id="lblOccupation")
         occupation = occupation_elem.text.strip() if occupation_elem else None
-        physician_elem = demo_soup.select_one("span#lblDoc")
+        physician_elem = demo_soup.find("span", id="lblDoc")
         physician = physician_elem.text.strip() if physician_elem else None
-        advance_directive_elem = demo_soup.select_one("span#lblAdvancedDirective")
+        advance_directive_elem = demo_soup.find("span", id="lblAdvancedDirective")
         advance_directive = (
             advance_directive_elem.text.strip() if advance_directive_elem else None
         )
-        industry_elem = demo_soup.select_one("span#lblIndustry")
+        industry_elem = demo_soup.find("span", id="lblIndustry")
         industry = industry_elem.text.strip() if industry_elem else None
-        pref_clinic_elem = demo_soup.select_one("span#lblLocation")
+        pref_clinic_elem = demo_soup.find("span", id="lblLocation")
         pref_clinic = pref_clinic_elem.text.strip() if pref_clinic_elem else None
-        status_elem = demo_soup.select_one("span#lblStatus")
+        status_elem = demo_soup.find("span", id="lblStatus")
         status = status_elem.text.strip() if status_elem else None
-        benefit_elem = demo_soup.select_one("span#lblBenefitStatus")
+        benefit_elem = demo_soup.find("span", id="lblBenefitStatus")
         benefit = benefit_elem.text.strip() if benefit_elem else None
 
         data = {
@@ -777,7 +778,7 @@ PRINT
             if "fd_gs" in k_id.lower():
                 # specifically for pain and phq scale inputs
                 pain_scale_id = "FD_gsGSPaiComparativePainScale"
-                pain_scale_input = note_soup.select_one(f"input#{pain_scale_id}")
+                pain_scale_input = note_soup.find("input", id=pain_scale_id)
                 if k_id == pain_scale_id and pain_scale_input:
                     prefix = this_ont_template.get(k_id.replace("FD_gs", ""))
                     updated_data['FD_txtPain'] = f"{prefix} {k_value}"
@@ -791,7 +792,7 @@ PRINT
         # go over checkboxes and find if they print to any textfield
         for c_id, c_val in checkboxes_data.items():
             if c_val is True or c_val == "true":
-                c_elem = note_soup.select_one(f"input#{c_id}")
+                c_elem = note_soup.find("input", {"id": c_id})
                 prnt_location = c_elem.get("prnt")
                 label_elem = note_soup.find('label', {'for': c_id})
                 label = label_elem.text.strip() if label_elem else ""
@@ -989,7 +990,7 @@ PRINT
                 # check if checkbox has text input with type `FD_itb`
                 itb_id = key.replace('FD_chk', 'FD_itb')
                 if itb_id in existing_data:
-                    itb_elem = note_soup.select_one(f"input#{itb_id}")
+                    itb_elem = note_soup.find("input", {"id": itb_id})
                     itb_value = itb_elem.get("oldvalue") if itb_elem else None
                     # windy way, this is basically; value or old_value or ''
                     checkbox_pairs[new_key]["text"] = existing_data.get(itb_id) or itb_value or ''
@@ -1136,6 +1137,10 @@ PRINT
         doc_id = match.group(1) if match else None
         print(f"Latest note ID for ({note_name}): {doc_id}")
         return doc_id
+
+    @staticmethod
+    def encode_spaces_only(text):
+        return text.replace(' ', '%20') if text else ''
 
     @staticmethod
     def _parse_note_ont_template(soup) -> Dict[str, str]:
@@ -2231,12 +2236,20 @@ PRINT
 
     @staticmethod
     def _verify_note_str(data):
-        # The pattern: "background" followed by \u0001, then "DH_" followed by alphanumeric characters,
-        # then another \u0001, then another "DH_" pattern (same or different)
-        pattern = r"^background\u0001(DH_[A-Z0-9]+)\u0001(DH_[A-Z0-9]+)$"
+        # Pattern 1: "background" format with \u0001 separators
+        pattern1 = r"^background\u0001(DH_[A-Z0-9]+)\u0001(DH_[A-Z0-9]+)$"
 
-        match = re.match(pattern, data)
-        return bool(match)
+        # Pattern 2: Direct concatenation of two DH_ strings
+        pattern2 = r"^(DH_[A-Z0-9]+)(DH_[A-Z0-9]+)$"
+
+        # Pattern 3: Leading \x01 with \u0001 separators
+        pattern3 = r"^\x01(DH_[A-Z0-9]+)\u0001(DH_[A-Z0-9]+)$"
+
+        match1 = re.match(pattern1, data)
+        match2 = re.match(pattern2, data)
+        match3 = re.match(pattern3, data)
+
+        return bool(match1 or match2 or match3)
 
     @staticmethod
     def _apply_template_to_dict(
